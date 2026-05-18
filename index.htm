@@ -227,6 +227,8 @@ tr:hover td{background:#FAFAFA}
       <span class="topbar-role" id="role-badge"></span>
     </div>
     <div class="topbar-right">
+      <span id="sync-status" style="font-size:11px;color:#9CA3AF">未連線</span>
+      <button class="logout-btn" onclick="openUrlModal()" style="background:#EAF2EF;color:#4A7A6B;border-color:#B0CCC5">⚙ 設定 Sheets URL</button>
       <span id="topbar-date" style="font-size:12px;color:#888;"></span>
       <button class="logout-btn" onclick="doLogout()"><i class="ti ti-logout"></i> 登出</button>
     </div>
@@ -506,6 +508,123 @@ tr:hover td{background:#FAFAFA}
 </div>
 
 <script>
+// ===== GOOGLE SHEETS API CONFIG =====
+// ★ 部署 Apps Script 後，將 Web App URL 貼在這裡
+let GAS_URL = localStorage.getItem('gas_url') || 'https://script.google.com/macros/s/AKfycbzbV1vUZFVXIWWXvyC8YkC2wcFfX504qUcsUS26WY4LRxYiiFFpRuoKkKAy6ISinPsS/exec';
+let isOnline = false;  // 是否已連線到 Google Sheets
+let syncStatus = 'init'; // 'init' | 'loading' | 'ok' | 'error' | 'offline'
+
+// ---- API 呼叫 ----
+async function gasCall(params) {
+  if (!GAS_URL) return null;
+  try {
+    const url = GAS_URL + '?' + new URLSearchParams(params).toString();
+    const res = await fetch(url);
+    const json = await res.json();
+    if (json.ok) return json.data;
+    console.error('GAS error:', json.error);
+    return null;
+  } catch(e) {
+    console.error('Network error:', e);
+    return null;
+  }
+}
+
+// ---- 從 Sheets 載入全部資料 ----
+async function loadFromSheets() {
+  setSyncStatus('loading');
+  const data = await gasCall({ action: 'loadAll' });
+  if (!data) { setSyncStatus('error'); return false; }
+
+  // 套用到記憶體
+  if (data.regs)      registrations = data.regs;
+  if (data.shortRegs) shortRegs = data.shortRegs;
+  if (data.students)  students = data.students;
+  if (data.rosters)   rosters = data.rosters;
+  if (data.closed)    closedDates = data.closed;
+  if (data.settings) {
+    const s = data.settings;
+    if (s.coaches)    try { coaches   = JSON.parse(s.coaches);   } catch(e) {}
+    if (s.feeTypes)   try { feeTypes  = JSON.parse(s.feeTypes);  } catch(e) {}
+    if (s.coachFees)  try { coachFees = JSON.parse(s.coachFees); } catch(e) {}
+    if (s.khRate)     khRate    = Number(s.khRate);
+    if (s.shortRate)  shortRate = Number(s.shortRate);
+  }
+
+  // 同時存 localStorage 作快取
+  sv('v3_regs', registrations); sv('v3_shortRegs', shortRegs);
+  sv('v3_students', students);  sv('v3_rosters', rosters);
+  sv('v3_closed', closedDates); sv('v3_coaches', coaches);
+  sv('v3_feeTypes', feeTypes);  sv('v3_coachFees', coachFees);
+  sv('v3_khRate', khRate);      sv('v3_shortRate', shortRate);
+
+  isOnline = true;
+  setSyncStatus('ok');
+  return true;
+}
+
+// ---- 儲存到 Sheets ----
+async function saveToSheets(type) {
+  if (!GAS_URL || !isOnline) return;
+  setSyncStatus('saving');
+  let result;
+  if (type === 'regs')      result = await gasCall({ action: 'saveRegs',      data: JSON.stringify(registrations) });
+  if (type === 'shortRegs') result = await gasCall({ action: 'saveShortRegs', data: JSON.stringify(shortRegs) });
+  if (type === 'students')  result = await gasCall({ action: 'saveStudents',  data: JSON.stringify(students) });
+  if (type === 'rosters')   result = await gasCall({ action: 'saveRosters',   data: JSON.stringify(rosters) });
+  if (type === 'closed')    result = await gasCall({ action: 'saveClosed',    data: JSON.stringify(closedDates) });
+  if (type === 'settings')  result = await gasCall({ action: 'saveSettings',  data: JSON.stringify({
+    coaches: JSON.stringify(coaches), feeTypes: JSON.stringify(feeTypes),
+    coachFees: JSON.stringify(coachFees), khRate, shortRate
+  })});
+  setSyncStatus(result ? 'ok' : 'error');
+}
+
+// ---- 同步狀態顯示 ----
+function setSyncStatus(status) {
+  syncStatus = status;
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  const map = {
+    init:    { text: '未連線', color: '#9CA3AF' },
+    loading: { text: '⟳ 載入中...', color: '#F59E0B' },
+    saving:  { text: '⟳ 儲存中...', color: '#F59E0B' },
+    ok:      { text: '✓ 已同步', color: '#10B981' },
+    error:   { text: '⚠ 連線失敗', color: '#EF4444' },
+    offline: { text: '本機模式', color: '#9CA3AF' },
+  };
+  const s = map[status] || map.init;
+  el.textContent = s.text; el.style.color = s.color;
+}
+
+// ---- URL 設定 Modal ----
+function openUrlModal() {
+  document.getElementById('gas-url-input').value = GAS_URL;
+  document.getElementById('url-modal').classList.add('show');
+}
+async function saveGasUrl() {
+  const url = document.getElementById('gas-url-input').value.trim();
+  if (!url) return;
+  GAS_URL = url;
+  localStorage.setItem('gas_url', url);
+  document.getElementById('url-modal').classList.remove('show');
+  const ok = await loadFromSheets();
+  if (ok) { refreshCurrentPage(); alert('✓ 連線成功！資料已從 Google Sheets 載入'); }
+  else alert('⚠ 連線失敗，請確認 URL 是否正確');
+}
+function refreshCurrentPage() {
+  const activePage = document.querySelector('.page.active');
+  if (!activePage) return;
+  const id = activePage.id.replace('page-','');
+  const btn = document.getElementById('nb-'+id);
+  if (btn) goPage(id);
+  else {
+    renderSchedule(); renderRegTable(); renderShortTable();
+    renderStudents(); renderFinance(); renderSettings();
+  }
+}
+
+// ===== DATA =====
 // ===== DATA =====
 const DEF_COACHES=['Carol','Adam','Kenny','Joanne','Vis','Kevin','Allen','Sean','Ava','Howard','Ella','Elly','Gary','Foin','William'];
 const DEF_FEES=[{name:'單堂',amount:3000},{name:'個人套組 第一堂',amount:2800},{name:'個人套組 第二堂',amount:2800},{name:'2人套組',amount:2500},{name:'3人套組',amount:2200},{name:'週週下場班（4堂）',amount:10000}];
@@ -563,6 +682,15 @@ function doLogin(){
   buildNav();
   const firstPage=getAllowedPages()[0];
   if(firstPage)goPage(firstPage);
+  // Auto load from Sheets if URL is already configured
+  if(GAS_URL){
+    setSyncStatus('loading');
+    loadFromSheets().then(ok=>{
+      if(ok) refreshCurrentPage();
+    });
+  } else {
+    setSyncStatus('offline');
+  }
 }
 
 function doLogout(){
@@ -732,19 +860,19 @@ function submitReg(){
   if(!selfCoach||!date||!coach||!stuName){al.className='alert alert-warn';al.textContent='請填寫所有必填欄位';return}
   if(!selectedStudentId&&!isNewStudent){al.className='alert alert-warn';al.textContent='請確認學員身份';return}
   let stuId=selectedStudentId;
-  if(isNewStudent){const sess=parseInt(document.getElementById('new-stu-sessions').value)||1;const ns={id:Date.now(),name:stuName,plan:'單堂',totalSessions:sess,source:'auto'};students.push(ns);sv('v3_students',students);stuId=ns.id}
+  if(isNewStudent){const sess=parseInt(document.getElementById('new-stu-sessions').value)||1;const ns={id:Date.now(),name:stuName,plan:'單堂',totalSessions:sess,source:'auto'};students.push(ns);sv('v3_students',students);saveToSheets('students');stuId=ns.id}
   const taken=registrations.filter(r=>r.date===date&&r.coach===coach).reduce((s,r)=>s+r.count,0);
   if(taken+count>4){al.className='alert alert-warn';al.textContent='⚠️ 加入後超過4人上限';return}
   const stu=students.find(s=>s.id===stuId),remain=getRemain(stu);
   if(remain<sessions){al.className='alert alert-warn';al.textContent='⚠️ 學員剩餘堂數不足（剩 '+remain+' 堂）';return}
   const ft=feeTypes.find(f=>f.name===feeType),now=Date.now();
   registrations.push({id:now,createdAt:now,date,selfCoach,coach,studentId:stuId,studentName:stu.name,count,sessions,level,feeType,note,amount:ft?ft.amount:0,khFee:count*khRate,coachFee:calcLockedCoachFee(coach,count)});
-  sv('v3_regs',registrations);
+  sv('v3_regs',registrations);saveToSheets('regs');
   al.className='alert alert-success';al.textContent='✓ 報名成功：'+stu.name+(isNewStudent?' （已自動建檔）':'')+' ／ '+date+' ／ 教練：'+coach;
   resetStudentFields();document.getElementById('reg-sessions').value=1;syncCoachHours();renderRegTable();setTimeout(()=>{al.className='alert'},5000);
 }
 function clearReg(){resetStudentFields();document.getElementById('reg-note').value='';document.getElementById('reg-sessions').value=1;syncCoachHours()}
-function deleteReg(id){if(!confirm('確定刪除此筆報名？'))return;registrations=registrations.filter(r=>r.id!==id);sv('v3_regs',registrations);renderRegTable();renderSchedule();renderStudents()}
+function deleteReg(id){if(!confirm('確定刪除此筆報名？'))return;registrations=registrations.filter(r=>r.id!==id);sv('v3_regs',registrations);saveToSheets('regs');renderRegTable();renderSchedule();renderStudents()}
 function renderRegTable(){
   const tbody=document.getElementById('reg-tbody');if(!tbody)return;
   if(!registrations.length){tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:#9CA3AF;padding:2rem">尚無報名記錄</td></tr>';return}
@@ -793,16 +921,16 @@ function submitShort(){
   if(!coach||!date||!time||!stuName){al.className='alert alert-warn';al.textContent='請填寫教練、日期、時段及學員姓名';return}
   if(!shortSelectedStudentId&&!shortIsNewStudent){al.className='alert alert-warn';al.textContent='請確認學員身份';return}
   let stuId=shortSelectedStudentId;
-  if(shortIsNewStudent){const sess=parseInt(document.getElementById('short-new-stu-sessions').value)||1;const ns={id:Date.now(),name:stuName,plan:'單堂',totalSessions:sess,source:'auto'};students.push(ns);sv('v3_students',students);stuId=ns.id}
+  if(shortIsNewStudent){const sess=parseInt(document.getElementById('short-new-stu-sessions').value)||1;const ns={id:Date.now(),name:stuName,plan:'單堂',totalSessions:sess,source:'auto'};students.push(ns);sv('v3_students',students);saveToSheets('students');stuId=ns.id}
   const stu=students.find(s=>s.id===stuId),now=Date.now();
   shortRegs.push({id:now,createdAt:now,date,time,coach,studentId:stuId,studentName:stu.name,count,note,amount:shortRate*count});
-  sv('v3_shortRegs',shortRegs);
+  sv('v3_shortRegs',shortRegs);saveToSheets('shortRegs');
   al.className='alert alert-success';al.textContent='✓ 短桿果嶺報名成功：'+stu.name+' ／ '+date+' ／ 教練：'+coach;
   resetShortFields();document.getElementById('short-note').value='';renderShortTable();renderSchedule();renderStudents();
   setTimeout(()=>{al.className='alert'},4000);
 }
 function clearShort(){resetShortFields();document.getElementById('short-note').value='';calcShortFee()}
-function deleteShort(id){if(!confirm('確定刪除？'))return;shortRegs=shortRegs.filter(r=>r.id!==id);sv('v3_shortRegs',shortRegs);renderShortTable();renderSchedule();renderStudents()}
+function deleteShort(id){if(!confirm('確定刪除？'))return;shortRegs=shortRegs.filter(r=>r.id!==id);sv('v3_shortRegs',shortRegs);saveToSheets('shortRegs');renderShortTable();renderSchedule();renderStudents()}
 function renderShortTable(){
   const tbody=document.getElementById('short-tbody');if(!tbody)return;
   if(!shortRegs.length){tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:#9CA3AF;padding:2rem">尚無短桿果嶺報名記錄</td></tr>';return}
@@ -838,13 +966,13 @@ function confirmReschedule(){
   if(taken+r.count>4){al.className='alert alert-warn';al.textContent='⚠️ 該教練此日名額不足';return}
   const oldDate=r.date,oldCoach=r.coach;r.date=newDate;r.coach=newCoach;
   r.rescheduleLog=(r.rescheduleLog||[]);r.rescheduleLog.push({from:oldDate,fromCoach:oldCoach,to:newDate,toCoach:newCoach,reason:reason||'未填寫'});
-  sv('v3_regs',registrations);closeModal();renderRegTable();renderSchedule();
+  sv('v3_regs',registrations);saveToSheets('regs');closeModal();renderRegTable();renderSchedule();
 }
 function closeModal(){document.getElementById('reschedule-modal').classList.remove('show');rescheduleTargetId=null}
 
 // ===== STUDENTS =====
-function addStudent(){const name=document.getElementById('stu-name').value.trim(),plan=document.getElementById('stu-plan').value,total=parseInt(document.getElementById('stu-total').value)||1;if(!name)return;students.push({id:Date.now(),name,plan,totalSessions:total,source:'manual'});sv('v3_students',students);document.getElementById('stu-name').value='';document.getElementById('stu-total').value='1';renderStudents()}
-function deleteStudent(id){students=students.filter(s=>s.id!==id);sv('v3_students',students);renderStudents()}
+function addStudent(){const name=document.getElementById('stu-name').value.trim(),plan=document.getElementById('stu-plan').value,total=parseInt(document.getElementById('stu-total').value)||1;if(!name)return;students.push({id:Date.now(),name,plan,totalSessions:total,source:'manual'});sv('v3_students',students);saveToSheets('students');document.getElementById('stu-name').value='';document.getElementById('stu-total').value='1';renderStudents()}
+function deleteStudent(id){students=students.filter(s=>s.id!==id);sv('v3_students',students);saveToSheets('students');renderStudents()}
 function renderStudents(){
   const search=document.getElementById('stu-search')?.value.toLowerCase()||'',planF=document.getElementById('stu-filter-plan')?.value||'';
   let list=students;if(search)list=list.filter(s=>s.name.toLowerCase().includes(search));if(planF)list=list.filter(s=>s.plan===planF);
@@ -874,11 +1002,11 @@ function onRosterDateChange(date){
   if(isClosed(date)){warn.classList.add('show');saveBtn.disabled=true;saveBtn.style.opacity='.4';document.querySelectorAll('.coach-cb').forEach(el=>el.classList.add('disabled'))}
   else{warn.classList.remove('show');saveBtn.disabled=false;saveBtn.style.opacity='1';document.querySelectorAll('.coach-cb').forEach(el=>el.classList.remove('disabled'));const existing=rosters[date]||[];document.querySelectorAll('.coach-cb input').forEach(cb=>{cb.checked=existing.includes(cb.value);updateCbStyle(cb.value)})}
 }
-function saveRoster(){const date=document.getElementById('roster-date').value;if(!date||isClosed(date))return;rosters[date]=Array.from(document.querySelectorAll('.coach-cb input:checked')).map(cb=>cb.value);sv('v3_rosters',rosters);const msg=document.getElementById('roster-saved');msg.style.display='inline';setTimeout(()=>msg.style.display='none',2000);renderRosterTable()}
-function addClosedDate(){const date=document.getElementById('closed-date').value,reason=document.getElementById('closed-reason').value.trim();if(!date)return;closedDates[date]={reason};sv('v3_closed',closedDates);document.getElementById('closed-reason').value='';renderClosedList();renderRosterTable();if(document.getElementById('roster-date').value===date)onRosterDateChange(date)}
-function removeClosedDate(date){delete closedDates[date];sv('v3_closed',closedDates);renderClosedList();renderRosterTable();if(document.getElementById('roster-date').value===date)onRosterDateChange(date)}
+function saveRoster(){const date=document.getElementById('roster-date').value;if(!date||isClosed(date))return;rosters[date]=Array.from(document.querySelectorAll('.coach-cb input:checked')).map(cb=>cb.value);sv('v3_rosters',rosters);saveToSheets('rosters');const msg=document.getElementById('roster-saved');msg.style.display='inline';setTimeout(()=>msg.style.display='none',2000);renderRosterTable()}
+function addClosedDate(){const date=document.getElementById('closed-date').value,reason=document.getElementById('closed-reason').value.trim();if(!date)return;closedDates[date]={reason};sv('v3_closed',closedDates);saveToSheets('closed');document.getElementById('closed-reason').value='';renderClosedList();renderRosterTable();if(document.getElementById('roster-date').value===date)onRosterDateChange(date)}
+function removeClosedDate(date){delete closedDates[date];sv('v3_closed',closedDates);saveToSheets('closed');renderClosedList();renderRosterTable();if(document.getElementById('roster-date').value===date)onRosterDateChange(date)}
 function renderClosedList(){const el=document.getElementById('closed-list'),dates=Object.keys(closedDates).sort();if(!dates.length){el.innerHTML='<div style="font-size:13px;color:#9CA3AF">尚無封場日期</div>';return}el.innerHTML=dates.map(d=>`<div class="si" style="padding:6px 0"><div><span class="tag tag-red" style="margin-right:6px">${d}</span><span style="font-size:12px;color:#888">${closedDates[d].reason||'—'}</span></div><button class="btn btn-danger btn-sm" onclick="removeClosedDate('${d}')">刪除</button></div>`).join('')}
-function deleteRoster(date){delete rosters[date];sv('v3_rosters',rosters);renderRosterTable()}
+function deleteRoster(date){delete rosters[date];sv('v3_rosters',rosters);saveToSheets('rosters');renderRosterTable()}
 function renderRosterTable(){const tbody=document.getElementById('roster-tbody');if(!tbody)return;const allDates=[...new Set([...Object.keys(rosters),...Object.keys(closedDates)])].sort();if(!allDates.length){tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:#9CA3AF;padding:1.5rem">尚無排班資料</td></tr>';return}tbody.innerHTML=allDates.map(d=>{if(isClosed(d))return `<tr style="background:#FEF2F2"><td>${d}</td><td><span class="tag tag-red"><i class="ti ti-ban"></i> 封場</span>${closedDates[d].reason?' <span style="font-size:12px;color:#DC2626">'+closedDates[d].reason+'</span>':''}</td><td>—</td><td><button class="btn btn-danger btn-sm" onclick="removeClosedDate('${d}')">刪除</button></td></tr>`;return `<tr><td>${d}</td><td><span class="tag tag-green">開放排班</span></td><td>${(rosters[d]||[]).join('、')||'—'}</td><td><button class="btn btn-danger btn-sm" onclick="deleteRoster('${d}')">刪除</button></td></tr>`}).join('')}
 
 // ===== FINANCE =====
@@ -937,10 +1065,10 @@ function renderSettings(){
   document.getElementById('fee-types-ui').innerHTML=feeTypes.map((ft,i)=>`<div class="si"><span>${ft.name}</span><div class="ilfx"><input type="number" value="${ft.amount}" onchange="updateFeeAmt(${i},this.value)" style="width:90px;text-align:right;padding:5px 8px;border:1px solid #E0E0E0;border-radius:6px;font-family:'Noto Sans TC',sans-serif"><button class="btn btn-danger btn-sm" onclick="removeFeeType(${i})">刪除</button></div></div>`).join('');
   document.getElementById('coach-fee-ui').innerHTML=coaches.map(c=>`<div class="si"><div class="ilfx"><span class="avatar">${c.slice(0,2)}</span><span>${c}</span></div><div class="ilfx"><span style="font-size:12px;color:#888">NT$/人</span><input type="number" value="${getCoachFee(c)}" onchange="updateCoachFee('${c}',this.value)" style="width:90px;text-align:right;padding:5px 8px;border:1px solid #E0E0E0;border-radius:6px;font-family:'Noto Sans TC',sans-serif"></div></div>`).join('');
 }
-function addCoach(){const n=document.getElementById('new-coach').value.trim();if(!n||coaches.includes(n))return;coaches.push(n);sv('v3_coaches',coaches);document.getElementById('new-coach').value='';renderSettings()}
-function removeCoach(i){coaches.splice(i,1);sv('v3_coaches',coaches);renderSettings()}
-function addFeeType(){const n=document.getElementById('new-fee-name').value.trim(),a=parseInt(document.getElementById('new-fee-amt').value);if(!n||isNaN(a))return;feeTypes.push({name:n,amount:a});sv('v3_feeTypes',feeTypes);document.getElementById('new-fee-name').value='';document.getElementById('new-fee-amt').value='';renderSettings()}
-function removeFeeType(i){feeTypes.splice(i,1);sv('v3_feeTypes',feeTypes);renderSettings()}
+function addCoach(){const n=document.getElementById('new-coach').value.trim();if(!n||coaches.includes(n))return;coaches.push(n);sv('v3_coaches',coaches);saveToSheets('settings');document.getElementById('new-coach').value='';renderSettings()}
+function removeCoach(i){coaches.splice(i,1);sv('v3_coaches',coaches);saveToSheets('settings');renderSettings()}
+function addFeeType(){const n=document.getElementById('new-fee-name').value.trim(),a=parseInt(document.getElementById('new-fee-amt').value);if(!n||isNaN(a))return;feeTypes.push({name:n,amount:a});sv('v3_feeTypes',feeTypes);saveToSheets('settings');document.getElementById('new-fee-name').value='';document.getElementById('new-fee-amt').value='';renderSettings()}
+function removeFeeType(i){feeTypes.splice(i,1);sv('v3_feeTypes',feeTypes);saveToSheets('settings');renderSettings()}
 function updateFeeAmt(i,v){feeTypes[i].amount=parseInt(v)||0;sv('v3_feeTypes',feeTypes)}
 function updateCoachFee(c,v){coachFees[c]=parseInt(v)||0;sv('v3_coachFees',coachFees)}
 function saveKhRate(v){khRate=parseInt(v)||DEF_KH;sv('v3_khRate',khRate)}
@@ -953,5 +1081,28 @@ document.getElementById('export-start').value=today.slice(0,8)+'01';
 document.getElementById('export-end').value=today;
 document.getElementById('fin-month').value=today.slice(0,7);
 </script>
+
+<!-- URL Setting Modal -->
+<div class="modal-overlay" id="url-modal">
+  <div class="modal-box" style="max-width:500px">
+    <div class="modal-title">⚙ 設定 Google Sheets 連線</div>
+    <p style="font-size:13px;color:#666;margin-bottom:1rem">請將 Google Apps Script 部署後的 Web App URL 貼入下方。</p>
+    <div style="background:#F0FDF4;border:1px solid #A7F3D0;border-radius:8px;padding:12px;font-size:12px;color:#065F46;margin-bottom:1rem">
+      <strong>步驟：</strong><br>
+      1. 開啟 Google Apps Script → 貼入 <code>GoogleAppsScript_貼到AppScript.js</code> 的內容<br>
+      2. 點「部署 > 新增部署」，類型選「網頁應用程式」<br>
+      3. 存取權選「所有人」→ 複製 Web App URL<br>
+      4. 貼到下方欄位
+    </div>
+    <div class="fg" style="margin-bottom:1rem">
+      <label>Web App URL</label>
+      <input type="text" id="gas-url-input" placeholder="https://script.google.com/macros/s/..." style="font-size:12px">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" onclick="saveGasUrl()">連線並載入資料</button>
+      <button class="btn" onclick="document.getElementById('url-modal').classList.remove('show')">取消</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
