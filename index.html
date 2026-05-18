@@ -213,6 +213,13 @@ tr:hover td{background:#FAFAFA}
         </div>
       </div>
     </div>
+    <div id="password-field" style="display:none;margin-bottom:12px">
+      <input type="password" id="login-password" placeholder="請輸入密碼" 
+        style="width:100%;padding:12px 14px;border:1.5px solid #E5E5E5;border-radius:10px;font-size:14px;font-family:'Noto Sans TC',sans-serif;outline:none;transition:border .15s"
+        onfocus="this.style.borderColor='#6B9E8F'" onblur="this.style.borderColor='#E5E5E5'"
+        onkeydown="if(event.key==='Enter')doLogin()">
+      <div id="password-error" style="color:#EF4444;font-size:12px;margin-top:6px;display:none">密碼錯誤，請再試一次</div>
+    </div>
     <button class="login-btn" id="login-btn" onclick="doLogin()" disabled>進入系統</button>
     <div class="login-hint">元木運動內部系統 · 僅限授權人員使用</div>
   </div>
@@ -664,14 +671,39 @@ const NAV_ITEMS=[
 const TOP_PAGES=['schedule','register','short'];
 const BOTTOM_PAGES=['students','roster','finance','settings'];
 
+const ROLE_PASSWORDS = {
+  admin: 'hope2026',
+  finance: 'hopehope2026',
+  coach: null
+};
+
 function selectRole(role,btn){
   document.querySelectorAll('.role-btn').forEach(b=>b.classList.remove('selected'));
   btn.classList.add('selected');
   currentRole=role;
   document.getElementById('login-btn').disabled=false;
+  document.getElementById('password-error').style.display='none';
+  document.getElementById('login-password').value='';
+  // 顯示/隱藏密碼欄
+  const needsPw = ROLE_PASSWORDS[role] !== null;
+  document.getElementById('password-field').style.display = needsPw ? 'block' : 'none';
 }
 
 function doLogin(){
+  // 密碼驗證
+  const requiredPw = ROLE_PASSWORDS[currentRole];
+  if(requiredPw !== null){
+    const inputPw = document.getElementById('login-password').value;
+    if(inputPw !== requiredPw){
+      document.getElementById('password-error').style.display='block';
+      document.getElementById('login-password').focus();
+      return;
+    }
+  }
+  document.getElementById('password-error').style.display='none';
+  _doLoginContinue();
+}
+function _doLoginContinue(){
   if(!currentRole)return;
   document.getElementById('login-screen').style.display='none';
   document.getElementById('app').style.display='block';
