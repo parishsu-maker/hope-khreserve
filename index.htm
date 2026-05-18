@@ -510,7 +510,7 @@ tr:hover td{background:#FAFAFA}
 <script>
 // ===== GOOGLE SHEETS API CONFIG =====
 // ★ 部署 Apps Script 後，將 Web App URL 貼在這裡
-let GAS_URL = localStorage.getItem('gas_url') || 'https://script.google.com/macros/s/AKfycbzbV1vUZFVXIWWXvyC8YkC2wcFfX504qUcsUS26WY4LRxYiiFFpRuoKkKAy6ISinPsS/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzbV1vUZFVXIWWXvyC8YkC2wcFfX504qUcsUS26WY4LRxYiiFFpRuoKkKAy6ISinPsS/exec';
 let isOnline = false;  // 是否已連線到 Google Sheets
 let syncStatus = 'init'; // 'init' | 'loading' | 'ok' | 'error' | 'offline'
 
@@ -1080,6 +1080,8 @@ document.getElementById('export-month').value=today.slice(0,7);
 document.getElementById('export-start').value=today.slice(0,8)+'01';
 document.getElementById('export-end').value=today;
 document.getElementById('fin-month').value=today.slice(0,7);
+// 自動存 URL 到 localStorage
+localStorage.setItem('gas_url', 'https://script.google.com/macros/s/AKfycbzbV1vUZFVXIWWXvyC8YkC2wcFfX504qUcsUS26WY4LRxYiiFFpRuoKkKAy6ISinPsS/exec');
 </script>
 
 <!-- URL Setting Modal -->
