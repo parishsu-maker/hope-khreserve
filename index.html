@@ -348,7 +348,7 @@ tr:hover td{background:#FAFAFA}
           <div style="font-size:12px;color:#888;margin-bottom:6px"><span class="step-badge">2</span>學員資訊</div>
           <div class="form-row" style="margin-bottom:6px">
             <div class="fg" style="grid-column:span 2"><label>學員姓名</label>
-              <input type="text" id="short-stu-name" placeholder="輸入姓名..." oninput="onShortStuNameInput()" autocomplete="off"></div>
+              <input type="text" id="short-stu-name" placeholder="輸入姓名..." oninput="onShortStuNameInput()" autocomplete="off" spellcheck="false"></div>
             <div class="fg"><label>人數</label>
               <select id="short-count" onchange="calcShortFee()"><option value="1">1人</option><option value="2">2人</option><option value="3">3人</option><option value="4">4人</option><option value="5">5人</option><option value="6">6人</option></select></div>
           </div>
@@ -923,7 +923,12 @@ function submitReg(){
   if(currentRole!=='admin'&&date<todayISO()){al.className='alert alert-danger';al.textContent='⛔ 不可選擇過去日期，如需補登請聯絡行政由後台操作';return}
   if(isClosed(date)){al.className='alert alert-danger';al.textContent='⛔ 此日為封場日，無法報名';return}
   if(!selfCoach||!date||!coach||!stuName){al.className='alert alert-warn';al.textContent='請填寫所有必填欄位';return}
-  if(!selectedStudentId&&!isNewStudent){al.className='alert alert-warn';al.textContent='請確認學員身份';return}
+  // 如果姓名有填但還沒確認身份，自動判斷
+  if(!selectedStudentId&&!isNewStudent){
+    const exactStu=students.find(s=>s.name===stuName);
+    if(exactStu){selectedStudentId=exactStu.id;}
+    else{isNewStudent=true;}
+  }
   let stuId=selectedStudentId;
   if(isNewStudent){const sess=parseInt(document.getElementById('new-stu-sessions').value)||1;const ns={id:Date.now(),name:stuName,plan:'單堂',totalSessions:sess,source:'auto'};students.push(ns);sv('v3_students',students);saveToSheets('students');stuId=ns.id}
   const taken=registrations.filter(r=>r.date===date&&r.coach===coach).reduce((s,r)=>s+r.count,0);
@@ -966,14 +971,29 @@ function initShortPage(){
 }
 function calcShortFee(){const count=parseInt(document.getElementById('short-count')?.value||1);document.getElementById('short-fee-display').value='NT$ '+(shortRate*count).toLocaleString()}
 function onShortStuNameInput(){
-  const name=document.getElementById('short-stu-name').value.trim();shortSelectedStudentId=null;shortIsNewStudent=false;
-  document.getElementById('short-existing-stu-info').style.display='none';document.getElementById('short-new-student-box').classList.remove('show');document.getElementById('short-similar-box').classList.remove('show');
+  const name=document.getElementById('short-stu-name').value.trim();
+  shortSelectedStudentId=null;shortIsNewStudent=false;
+  document.getElementById('short-existing-stu-info').style.display='none';
+  document.getElementById('short-new-student-box').classList.remove('show');
+  document.getElementById('short-similar-box').classList.remove('show');
   if(!name.length)return;
+  // 精確符合：直接選定
   const exact=students.find(s=>s.name===name);
-  if(exact){shortSelectedStudentId=exact.id;const info=document.getElementById('short-existing-stu-info');info.style.display='block';info.innerHTML=`<span class="tag tag-blue" style="margin-right:8px">找到學員</span><strong>${exact.name}</strong>`;return}
+  if(exact){
+    shortSelectedStudentId=exact.id;
+    const info=document.getElementById('short-existing-stu-info');
+    info.style.display='block';
+    info.innerHTML=`<span class="tag tag-blue" style="margin-right:8px">找到學員</span><strong>${exact.name}</strong>`;
+    return;
+  }
+  // 相似：顯示選項（但不阻擋，若直接送出視為新學員）
   const similar=findSimilar(name);
-  if(similar.length){document.getElementById('short-similar-box').classList.add('show');document.getElementById('short-similar-list').innerHTML=similar.map(s=>`<div class="similar-item"><span><strong>${s.name}</strong> — ${s.plan}</span><button class="btn btn-sm" onclick="selectShortExistingStu(${s.id},'${s.name}')">就是這位</button></div>`).join('');}
-  else{shortIsNewStudent=true;document.getElementById('short-new-student-box').classList.add('show')}
+  if(similar.length){
+    document.getElementById('short-similar-box').classList.add('show');
+    document.getElementById('short-similar-list').innerHTML=similar.map(s=>`<div class="similar-item"><span><strong>${s.name}</strong> — ${s.plan}</span><button class="btn btn-sm" onclick="selectShortExistingStu(${s.id},'${s.name}')">就是這位</button></div>`).join('');
+  }
+  // 不管是否相似，只要有名字就標記可提交（送出時再判斷）
+  shortIsNewStudent=true;
 }
 function selectShortExistingStu(id,name){shortSelectedStudentId=id;shortIsNewStudent=false;document.getElementById('short-stu-name').value=name;document.getElementById('short-similar-box').classList.remove('show');document.getElementById('short-new-student-box').classList.remove('show');const s=students.find(st=>st.id===id);const info=document.getElementById('short-existing-stu-info');info.style.display='block';info.innerHTML=`<span class="tag tag-blue" style="margin-right:8px">已選擇</span><strong>${s.name}</strong>`}
 function confirmShortNewStudent(){document.getElementById('short-similar-box').classList.remove('show');shortIsNewStudent=true;document.getElementById('short-new-student-box').classList.add('show')}
@@ -984,7 +1004,12 @@ function submitShort(){
   const al=document.getElementById('short-alert');
   if(currentRole!=='admin'&&date<todayISO()){al.className='alert alert-danger';al.textContent='⛔ 不可選擇過去日期，如需補登請聯絡行政由後台操作';return}
   if(!coach||!date||!time||!stuName){al.className='alert alert-warn';al.textContent='請填寫教練、日期、時段及學員姓名';return}
-  if(!shortSelectedStudentId&&!shortIsNewStudent){al.className='alert alert-warn';al.textContent='請確認學員身份';return}
+  // 如果姓名有填但還沒確認身份，自動判斷
+  if(!shortSelectedStudentId&&!shortIsNewStudent){
+    const exact=students.find(s=>s.name===stuName);
+    if(exact){shortSelectedStudentId=exact.id;}
+    else{shortIsNewStudent=true;}
+  }
   let stuId=shortSelectedStudentId;
   if(shortIsNewStudent){const sess=parseInt(document.getElementById('short-new-stu-sessions').value)||1;const ns={id:Date.now(),name:stuName,plan:'單堂',totalSessions:sess,source:'auto'};students.push(ns);sv('v3_students',students);saveToSheets('students');stuId=ns.id}
   const stu=students.find(s=>s.id===stuId),now=Date.now();
