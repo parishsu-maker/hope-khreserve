@@ -1087,7 +1087,7 @@ function downloadExcel(mode){
   const byCoach={};regs.forEach(r=>{const open=isClassOpen(r.date,r.coach);const sessions=r.sessions||r.count;if(!byCoach[r.coach])byCoach[r.coach]={openDays:new Set(),students:0,sessions:0,coachHours:0,fee:0};if(open){byCoach[r.coach].openDays.add(r.date);byCoach[r.coach].students+=r.count;byCoach[r.coach].sessions+=sessions;byCoach[r.coach].coachHours+=r.count;byCoach[r.coach].fee+=(r.coachFee||0)}});
   const coachRows=Object.entries(byCoach).map(([c,d])=>({'教練':c,'開班堂數':d.openDays.size,'學員總人次':d.students,'課堂數':d.sessions,'教練上課時數':d.coachHours,'教練費合計':Math.round(d.fee)}));
   const shortRows=sRegs.map(r=>({'日期':r.date,'登記時間':fmtTime(r.createdAt||r.id),'時段':r.time,'教練':r.coach,'學員姓名':r.studentName,'人數':r.count,'收款':r.amount,'備註':r.note||''}));
-  const summaryRows=[{'項目':'區間','數值':start+' 至 '+end},{'項目':'下場班總人次','數值':regs.reduce((s,r)=>s+r.count,0)},{'項目':'已開班課堂數','數值':openRegs.reduce((s,r)=>s+(r.sessions||r.count),0)},{'項目':'已開班教練上課時數','數值':openRegs.reduce((s,r)=>s+r.count,0)},{'項目':'應付國華費用（NT$）','數值':regs.reduce((s,r)=>s+(r.khFee||0),0)},{'項目':'教練費合計（僅開班）','數值':Math.round(openRegs.reduce((s,r)=>s+(r.coachFee||0),0))},{'項目':'短桿果嶺總收款','數值':sRegs.reduce((s,r)=>s+r.amount,0)},{'項目':'短桿果嶺人次','數值':sRegs.reduce((s,r)=>s+r.count,0)}];
+  const summaryRows=[{'項目':'區間','數值':start+' 至 '+end},{'項目':'下場班總人次','數值':regs.reduce((s,r)=>s+r.count,0)},{'項目':'已開班課堂數','數值':openRegs.reduce((s,r)=>s+(r.sessions||r.count),0)},{'項目':'已開班教練上課時數','數值':openRegs.reduce((s,r)=>s+r.count,0)},{'項目':'應付國華費用（NT$）','數值':openRegs.reduce((s,r)=>s+(r.khFee||0),0)},{'項目':'教練費合計（僅開班）','數值':Math.round(openRegs.reduce((s,r)=>s+(r.coachFee||0),0))},{'項目':'短桿果嶺總收款','數值':sRegs.reduce((s,r)=>s+r.amount,0)},{'項目':'短桿果嶺人次','數值':sRegs.reduce((s,r)=>s+r.count,0)}];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(detailRows.length?detailRows:[{提示:'此區間無資料'}]),'下場班明細');
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(coachRows.length?coachRows:[{提示:'此區間無資料'}]),'教練費彙總');
@@ -1101,16 +1101,16 @@ function renderFinance(){
   let regs=registrations;if(month)regs=regs.filter(r=>r.date.startsWith(month));if(fc)regs=regs.filter(r=>r.coach===fc);
   let sRegs=shortRegs;if(month)sRegs=sRegs.filter(r=>r.date.startsWith(month));
   const openRegs=regs.filter(r=>isClassOpen(r.date,r.coach));
-  const totalStu=regs.reduce((s,r)=>s+r.count,0),totalKH=regs.reduce((s,r)=>s+(r.khFee!==undefined?r.khFee:r.count*khRate),0);
+  const totalStu=regs.reduce((s,r)=>s+r.count,0),totalKH=openRegs.reduce((s,r)=>s+(r.khFee!==undefined?r.khFee:r.count*khRate),0);
   const totalCF=openRegs.reduce((s,r)=>s+(r.coachFee||0),0),totalSessions=openRegs.reduce((s,r)=>s+(r.sessions||r.count),0),totalCoachHours=openRegs.reduce((s,r)=>s+r.count,0);
   const totalShortRev=sRegs.reduce((s,r)=>s+r.amount,0),totalShortStu=sRegs.reduce((s,r)=>s+r.count,0);
   document.getElementById('fin-metrics').innerHTML=`
     <div class="metric"><div class="m-label">下場人次</div><div class="m-value">${totalStu}</div><div class="m-sub">人次</div></div>
     <div class="metric"><div class="m-label">課堂數（開班）</div><div class="m-value">${totalSessions}</div><div class="m-sub">堂</div></div>
     <div class="metric"><div class="m-label">教練上課時數</div><div class="m-value">${totalCoachHours}</div><div class="m-sub">人次（開班）</div></div>
-    <div class="metric"><div class="m-label">應付國華</div><div class="m-value">$${Math.round(totalKH).toLocaleString()}</div><div class="m-sub">NT$（鎖定）</div></div>
-    <div class="metric"><div class="m-label">教練費合計</div><div class="m-value">$${Math.round(totalCF).toLocaleString()}</div><div class="m-sub">NT$（僅開班）</div></div>
-    <div class="metric"><div class="m-label">短桿果嶺收款</div><div class="m-value">$${Math.round(totalShortRev).toLocaleString()}</div><div class="m-sub">NT$ / ${totalShortStu}人</div></div>`;
+    <div class="metric"><div class="m-label">下場班應付國華</div><div class="m-value">$${Math.round(totalKH).toLocaleString()}</div><div class="m-sub">NT$（僅開班）</div></div>
+    <div class="metric"><div class="m-label">短桿果嶺應付國華</div><div class="m-value">$${Math.round(totalShortRev).toLocaleString()}</div><div class="m-sub">NT$ / ${totalShortStu}人（代收代付）</div></div>
+    <div class="metric"><div class="m-label">教練費合計</div><div class="m-value">$${Math.round(totalCF).toLocaleString()}</div><div class="m-sub">NT$（僅開班）</div></div>`;
   const byCoach={};regs.forEach(r=>{const open=isClassOpen(r.date,r.coach);const sessions=r.sessions||r.count;if(!byCoach[r.coach])byCoach[r.coach]={openDays:new Set(),students:0,sessions:0,coachHours:0,fee:0};if(open){byCoach[r.coach].openDays.add(r.date);byCoach[r.coach].students+=r.count;byCoach[r.coach].sessions+=sessions;byCoach[r.coach].coachHours+=r.count;byCoach[r.coach].fee+=(r.coachFee||0)}});
   const ct=document.getElementById('fin-coach-tbody');
   const entries=Object.entries(byCoach).filter(([,d])=>d.openDays.size>0);
