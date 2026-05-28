@@ -540,20 +540,35 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbwz47KEU8iWvcIHA-aiNltQ
 let isOnline = false;
 let syncStatus = 'init';
 
-// ---- API 呼叫 ----
-async function gasCall(params) {
-  if (!GAS_URL) return null;
-  try {
-    const url = GAS_URL + '?' + new URLSearchParams(params).toString();
-    const res = await fetch(url);
-    const json = await res.json();
-    if (json.ok) return json.data;
-    console.error('GAS error:', json.error);
-    return null;
-  } catch(e) {
-    console.error('Network error:', e);
-    return null;
-  }
+// ---- API 呼叫 (JSONP，相容 Safari ITP) ----
+function gasCall(params) {
+  return new Promise((resolve) => {
+    if (!GAS_URL) { resolve(null); return; }
+    try {
+      const cbName = 'gcb_' + Date.now() + '_' + Math.floor(Math.random()*10000);
+      const allParams = Object.assign({}, params, { callback: cbName });
+      const url = GAS_URL + '?' + new URLSearchParams(allParams).toString();
+      const script = document.createElement('script');
+      const timer = setTimeout(() => {
+        cleanup(); console.error('GAS timeout'); resolve(null);
+      }, 15000);
+      function cleanup() {
+        clearTimeout(timer);
+        delete window[cbName];
+        if (script.parentNode) script.parentNode.removeChild(script);
+      }
+      window[cbName] = function(json) {
+        cleanup();
+        if (json && json.ok) resolve(json.data);
+        else { console.error('GAS error:', json); resolve(null); }
+      };
+      script.onerror = function() { cleanup(); console.error('GAS script error'); resolve(null); };
+      script.src = url;
+      document.head.appendChild(script);
+    } catch(e) {
+      console.error('GAS call error:', e); resolve(null);
+    }
+  });
 }
 
 // ===== 日期正規化：把任何格式都轉成 YYYY-MM-DD (本地時區) =====
