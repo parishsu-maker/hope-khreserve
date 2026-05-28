@@ -256,11 +256,13 @@ tr:hover td{background:#FAFAFA}
           <span class="week-label" id="week-label"></span>
           <button class="btn btn-sm" onclick="shiftWeek(1)" style="color:#1A1A1A"><i class="ti ti-chevron-right" style="color:#1A1A1A"></i></button>
           <button class="btn btn-sm" onclick="goThisWeek()" style="color:#1A1A1A">本週</button>
+          <button class="btn btn-sm" onclick="debugRosters()" style="color:#D97706;border-color:#FCD34D">🔍 診斷排班</button>
         </div>
         <div class="fg"><label style="font-size:12px;color:#888">篩選教練</label>
           <select id="sch-coach" onchange="renderSchedule()" style="width:120px"></select></div>
       </div>
       <div id="schedule-content"></div>
+      <div id="roster-debug" style="display:none;background:#FFFBEB;border:1px solid #FCD34D;border-radius:8px;padding:12px;margin-top:8px;font-size:12px;font-family:monospace;white-space:pre-wrap;word-break:break-all"></div>
     </div>
 
     <!-- 下場班報名 -->
@@ -792,8 +794,16 @@ function _doLoginContinue(){
   if(GAS_URL){
     setSyncStatus('loading');
     loadFromSheets().then(ok=>{
-      if(ok)refreshCurrentPage();
-      else{setSyncStatus('error');refreshCurrentPage();}
+      if(ok){
+        // 資料載入完成後，強制重新渲染所有已開啟的頁面
+        fillSel('sch-coach',true);
+        renderSchedule();
+        renderRegTable();
+        renderShortTable();
+      }else{
+        setSyncStatus('error');
+        refreshCurrentPage();
+      }
     });
   }else{setSyncStatus('offline');refreshCurrentPage();}
 }
@@ -855,18 +865,28 @@ function fillSel(id,withAll){const el=document.getElementById(id);if(!el)return;
 function syncCoachHours(){const c=parseInt(document.getElementById('reg-count')?.value||1);document.getElementById('preview-coach-hours').value=c+' 人次'}
 
 // ===== SCHEDULE =====
+function debugRosters(){
+  const el=document.getElementById('roster-debug');
+  el.style.display='block';
+  const keys=Object.keys(rosters);
+  const todayStr=todayISO();
+  let out='=== rosters 共 '+keys.length+' 筆 ===
+';
+  if(!keys.length){out+='⚠️ rosters 是空的！localStorage 或 Sheets 可能沒有資料。
+';}
+  else{keys.slice(0,10).forEach(k=>{out+=k+' (type:'+typeof k+') → '+JSON.stringify(rosters[k])+'
+';});}
+  out+='
+=== toISO(今天) = '+todayStr+' ===
+';
+  out+='=== localStorage v3_rosters ===
+';
+  try{const raw=localStorage.getItem('v3_rosters');out+=raw?raw.slice(0,300):'(空)';} catch(e){out+=e;}
+  el.textContent=out;
+}
 function shiftWeek(n){currentWeekStart=addDays(currentWeekStart,n*7);renderSchedule()}
 function goThisWeek(){currentWeekStart=getWeekStart(new Date());renderSchedule()}
-function initSchedulePage(){
-  fillSel('sch-coach',true);
-  if(GAS_URL&&isOnline){
-    setSyncStatus('loading');
-    loadFromSheets().then(ok=>{
-      if(ok){fillSel('sch-coach',true);}
-      renderSchedule();
-    });
-  }else{renderSchedule();}
-}
+function initSchedulePage(){fillSel('sch-coach',true);renderSchedule();}
 function renderSchedule(){
   fillSel('sch-coach',true);
   const fc=document.getElementById('sch-coach')?.value||'';
