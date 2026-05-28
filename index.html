@@ -889,7 +889,7 @@ function similarity(a,b){a=a.toLowerCase();b=b.toLowerCase();if(a===b)return 1;i
 function findSimilar(name){return students.filter(s=>similarity(s.name,name)>0.4&&s.name!==name)}
 function fmtTime(ts){if(!ts)return '';const d=new Date(Number(ts));if(isNaN(d.getTime()))return '';return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0')}
 function fillSel(id,withAll){const el=document.getElementById(id);if(!el)return;const cur=el.value;el.innerHTML=withAll?'<option value="">全部</option>':'<option value="">— 請選擇 —</option>';const list=(Array.isArray(coaches)&&coaches.length>0)?coaches:DEF_COACHES;list.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;el.appendChild(o)});if(cur)el.value=cur;}
-function syncCoachHours(){const c=parseInt(document.getElementById('reg-count')?.value||1);document.getElementById('preview-coach-hours').value=c+' 人次'}
+function syncCoachHours(){const c=parseInt((document.getElementById('reg-count')||{}).value||1);document.getElementById('preview-coach-hours').value=c+' 人次'}
 
 // ===== SCHEDULE =====
 function shiftWeek(n){currentWeekStart=addDays(currentWeekStart,n*7);renderSchedule()}
@@ -897,7 +897,7 @@ function goThisWeek(){currentWeekStart=getWeekStart(new Date());renderSchedule()
 function initSchedulePage(){fillSel('sch-coach',true);renderSchedule();}
 function renderSchedule(){
   fillSel('sch-coach',true);
-  const fc=document.getElementById('sch-coach')?.value||'';
+  const fc=(document.getElementById('sch-coach')||{}).value||'';
   const days=Array.from({length:7},(_,i)=>addDays(currentWeekStart,i));
   document.getElementById('week-label').textContent=toISO(days[0]).slice(5).replace('-','/')+' 一 — '+toISO(days[6]).slice(5).replace('-','/')+' 日';
   const todayStr=todayISO();
@@ -913,7 +913,7 @@ function renderSchedule(){
       <div class="${dateCls}"><strong>${date.slice(5).replace('-','/')}${isToday?' <span style="font-size:11px;color:#3B82F6;font-weight:400">今天</span>':''}</strong><span style="font-size:12px">15:00–17:00 國華球場</span></div>
       ${closed?'<span class="tag tag-red" style="margin-left:auto"><i class="ti ti-ban"></i> 封場</span>':''}</div>`;
     let body='';
-    if(closed){body=`<div class="day-body"><div style="font-size:13px;color:#DC2626;padding:8px 0;display:flex;align-items:center;gap:6px"><i class="ti ti-ban"></i> 封場日${closedDates[date]?.reason?' — '+closedDates[date].reason:''}</div></div>`}
+    if(closed){body=`<div class="day-body"><div style="font-size:13px;color:#DC2626;padding:8px 0;display:flex;align-items:center;gap:6px"><i class="ti ti-ban"></i> 封場日${(closedDates[date]&&closedDates[date].reason)?' — '+closedDates[date].reason:''}</div></div>`}
     else{
       let rows=dcs.length?dcs.map(coach=>{
         const rs=registrations.filter(r=>r.date===date&&r.coach===coach);
@@ -1054,7 +1054,7 @@ function getShortTime(){
   return sel;
 }
 
-function calcShortFee(){const count=parseInt(document.getElementById('short-count')?.value||1);document.getElementById('short-fee-display').value='NT$ '+(shortRate*count).toLocaleString()}
+function calcShortFee(){const count=parseInt((document.getElementById('short-count')||{}).value||1);document.getElementById('short-fee-display').value='NT$ '+(shortRate*count).toLocaleString()}
 function onShortStuNameInput(){
   const name=document.getElementById('short-stu-name').value.trim();
   shortSelectedStudentId=null;shortIsNewStudent=false;
@@ -1128,7 +1128,7 @@ function openReschedule(id){
 function onModalDateChange(){
   const date=document.getElementById('modal-new-date').value,r=registrations.find(x=>x.id===rescheduleTargetId);
   const sel=document.getElementById('modal-new-coach');sel.innerHTML='<option value="">— 選擇教練 —</option>';if(!date)return;
-  (rosters[date]||[]).forEach(c=>{const taken=registrations.filter(x=>x.date===date&&x.coach===c&&x.id!==rescheduleTargetId).reduce((s,x)=>s+x.count,0);const remaining=4-taken;const o=document.createElement('option');o.value=c;o.textContent=c+(remaining<(r?.count||1)?' 【名額不足】':' (剩'+remaining+'位)');if(remaining<(r?.count||1))o.disabled=true;sel.appendChild(o)});
+  (rosters[date]||[]).forEach(c=>{const taken=registrations.filter(x=>x.date===date&&x.coach===c&&x.id!==rescheduleTargetId).reduce((s,x)=>s+x.count,0);const remaining=4-taken;const o=document.createElement('option');o.value=c;o.textContent=c+(remaining<((r&&r.count||1))?' 【名額不足】':' (剩'+remaining+'位)');if(remaining<((r&&r.count||1)))o.disabled=true;sel.appendChild(o)});
 }
 function confirmReschedule(){
   const newDate=document.getElementById('modal-new-date').value,newCoach=document.getElementById('modal-new-coach').value,reason=document.getElementById('modal-reason').value.trim(),al=document.getElementById('modal-alert');
@@ -1146,7 +1146,7 @@ function closeModal(){document.getElementById('reschedule-modal').classList.remo
 function addStudent(){const name=document.getElementById('stu-name').value.trim(),plan=document.getElementById('stu-plan').value,total=parseInt(document.getElementById('stu-total').value)||1;if(!name)return;students.push({id:Date.now(),name,plan,totalSessions:total,source:'manual'});sv('v3_students',students);saveToSheets('students');document.getElementById('stu-name').value='';document.getElementById('stu-total').value='1';renderStudents()}
 function deleteStudent(id){students=students.filter(s=>s.id!==id);sv('v3_students',students);saveToSheets('students');renderStudents()}
 function renderStudents(){
-  const search=document.getElementById('stu-search')?.value.toLowerCase()||'',planF=document.getElementById('stu-filter-plan')?.value||'';
+  const search=(document.getElementById('stu-search')||{value:''}).value.toLowerCase()||'',planF=(document.getElementById('stu-filter-plan')||{}).value||'';
   let list=students;if(search)list=list.filter(s=>s.name.toLowerCase().includes(search));if(planF)list=list.filter(s=>s.plan===planF);
   const golfIds=new Set(registrations.map(r=>r.studentId));
   const golfList=list.filter(s=>golfIds.has(s.id));
@@ -1205,7 +1205,7 @@ function downloadExcel(mode){
 }
 function renderFinance(){
   fillSel('fin-coach',true);
-  const month=document.getElementById('fin-month')?.value||'',fc=document.getElementById('fin-coach')?.value||'';
+  const month=(document.getElementById('fin-month')||{}).value||'',fc=(document.getElementById('fin-coach')||{}).value||'';
   let regs=registrations;if(month)regs=regs.filter(r=>r.date.startsWith(month));if(fc)regs=regs.filter(r=>r.coach===fc);
   let sRegs=shortRegs;if(month)sRegs=sRegs.filter(r=>r.date.startsWith(month));
   const openRegs=regs.filter(r=>isClassOpen(r.date,r.coach));
