@@ -536,7 +536,7 @@ tr:hover td{background:#FAFAFA}
 
 <script>
 // ===== GOOGLE SHEETS API CONFIG =====
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbzbV1vUZFVXIWWXvyC8YkC2wcFfX504qUcsUS26WY4LRxYiiFFpRuoKkKAy6ISinPsS/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbyKc86uKf-LB_yc7pUnhIsGcYJTmq_DfbFd369EZyik2W7CENaSAxnk0akloj6d_Zj-/exec';
 let isOnline = false;
 let syncStatus = 'init';
 
@@ -693,7 +693,7 @@ const DEF_FEES=[{name:'單堂',amount:3000},{name:'個人套組 第一堂',amoun
 const DEF_COACH_FEE=1000,DEF_KH=1100,DEF_SHORT=500;
 const DOWS=['日','一','二','三','四','五','六'];
 
-function ld(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
+function ld(k,d){try{const v=localStorage.getItem(k);if(!v)return d;const p=JSON.parse(v);if(Array.isArray(d)&&Array.isArray(p)&&p.length===0)return d;return p}catch(e){return d}}
 function sv(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 
 let coaches=ld('v3_coaches',DEF_COACHES),feeTypes=ld('v3_feeTypes',DEF_FEES),coachFees=ld('v3_coachFees',{});
@@ -762,8 +762,11 @@ function _doLoginContinue(){
   if(firstPage)goPage(firstPage);
   if(GAS_URL){
     setSyncStatus('loading');
-    loadFromSheets().then(ok=>{if(ok)refreshCurrentPage();});
-  }else{setSyncStatus('offline');}
+    loadFromSheets().then(ok=>{
+      if(ok)refreshCurrentPage();
+      else{setSyncStatus('error');refreshCurrentPage();}
+    });
+  }else{setSyncStatus('offline');refreshCurrentPage();}
 }
 function doLogout(){
   document.getElementById('app').style.display='none';
@@ -819,7 +822,7 @@ function getUsedShort(sid){return shortRegs.filter(r=>r.studentId===sid).reduce(
 function similarity(a,b){a=a.toLowerCase();b=b.toLowerCase();if(a===b)return 1;if(a.includes(b)||b.includes(a))return 0.8;let m=0;for(const c of a)if(b.includes(c))m++;return m/Math.max(a.length,b.length)}
 function findSimilar(name){return students.filter(s=>similarity(s.name,name)>0.4&&s.name!==name)}
 function fmtTime(ts){if(!ts)return '';const d=new Date(Number(ts));if(isNaN(d.getTime()))return '';return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0')}
-function fillSel(id,withAll){const el=document.getElementById(id);if(!el)return;const cur=el.value;el.innerHTML=withAll?'<option value="">全部</option>':'<option value="">— 請選擇 —</option>';coaches.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;el.appendChild(o)});if(cur)el.value=cur;}
+function fillSel(id,withAll){const el=document.getElementById(id);if(!el)return;const cur=el.value;el.innerHTML=withAll?'<option value="">全部</option>':'<option value="">— 請選擇 —</option>';const list=coaches.length?coaches:DEF_COACHES;list.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;el.appendChild(o)});if(cur)el.value=cur;}
 function syncCoachHours(){const c=parseInt(document.getElementById('reg-count')?.value||1);document.getElementById('preview-coach-hours').value=c+' 人次'}
 
 // ===== SCHEDULE =====
@@ -1145,7 +1148,7 @@ document.getElementById('export-month').value=today.slice(0,7);
 document.getElementById('export-start').value=today.slice(0,8)+'01';
 document.getElementById('export-end').value=today;
 document.getElementById('fin-month').value=today.slice(0,7);
-localStorage.setItem('gas_url','https://script.google.com/macros/s/AKfycbzbV1vUZFVXIWWXvyC8YkC2wcFfX504qUcsUS26WY4LRxYiiFFpRuoKkKAy6ISinPsS/exec');
+localStorage.setItem('gas_url','https://script.google.com/macros/s/AKfycbyKc86uKf-LB_yc7pUnhIsGcYJTmq_DfbFd369EZyik2W7CENaSAxnk0akloj6d_Zj-/exec');
 </script>
 </body>
 </html>
