@@ -559,21 +559,21 @@ async function gasCall(params) {
 // ===== 日期正規化：把任何格式都轉成 YYYY-MM-DD (本地時區) =====
 function normalizeDate(val) {
   if (!val) return '';
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return '';
+    const y=val.getFullYear(),m=String(val.getMonth()+1).padStart(2,'0'),day=String(val.getDate()).padStart(2,'0');
+    return y+'-'+m+'-'+day;
+  }
   if (typeof val === 'string') {
-    // ISO timestamp like "2026-05-18T16:00:00.000Z" → use local date
     if (val.includes('T')) {
       const d = new Date(val);
       if (!isNaN(d.getTime())) {
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return y + '-' + m + '-' + day;
+        const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');
+        return y+'-'+m+'-'+day;
       }
     }
-    // Already "YYYY-MM-DD"
     return val.slice(0, 10);
   }
-  if (val instanceof Date) return toISO(val);
   return String(val).slice(0, 10);
 }
 
@@ -703,7 +703,7 @@ let shortRegs=ld('v3_shortRegs',[]);
 let rosters=ld('v3_rosters',{}),closedDates=ld('v3_closed',{});
 let selectedStudentId=null,isNewStudent=false;
 let shortSelectedStudentId=null,shortIsNewStudent=false;
-let currentWeekStart=getWeekStart(new Date());
+let currentWeekStart=null; // initialized after helpers are defined
 let rescheduleTargetId=null,exportMode='month';
 let currentRole=null;
 
@@ -1139,6 +1139,7 @@ function saveKhRate(v){khRate=parseInt(v)||DEF_KH;sv('v3_khRate',khRate)}
 function saveShortRate(v){shortRate=parseInt(v)||DEF_SHORT;sv('v3_shortRate',shortRate)}
 
 // ===== INIT =====
+currentWeekStart=getWeekStart(new Date());
 const today=todayISO();
 document.getElementById('export-month').value=today.slice(0,7);
 document.getElementById('export-start').value=today.slice(0,8)+'01';
