@@ -631,19 +631,38 @@ async function _flushSave(type) {
 
 function normalizeDate(val) {
   if (!val) return '';
+  // Google Sheets 序列數字（數字型態，如 46000）→ 轉回日期
+  if (typeof val === 'number') {
+    // Excel/Sheets epoch: 1899-12-30
+    var d = new Date(Math.round((val - 25569) * 86400 * 1000));
+    if (!isNaN(d.getTime())) {
+      var y=d.getUTCFullYear(),m=String(d.getUTCMonth()+1).padStart(2,'0'),day=String(d.getUTCDate()).padStart(2,'0');
+      return y+'-'+m+'-'+day;
+    }
+  }
   if (val instanceof Date) {
     if (isNaN(val.getTime())) return '';
-    const y=val.getFullYear(),m=String(val.getMonth()+1).padStart(2,'0'),day=String(val.getDate()).padStart(2,'0');
+    var y=val.getFullYear(),m=String(val.getMonth()+1).padStart(2,'0'),day=String(val.getDate()).padStart(2,'0');
     return y+'-'+m+'-'+day;
   }
   if (typeof val === 'string') {
-    if (val.includes('T')) {
-      const d = new Date(val);
-      if (!isNaN(d.getTime())) {
-        const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');
-        return y+'-'+m+'-'+day;
+    // 純數字字串也可能是序列數
+    if (/^\d{5}$/.test(val.trim())) {
+      var n = parseInt(val);
+      var d2 = new Date(Math.round((n - 25569) * 86400 * 1000));
+      if (!isNaN(d2.getTime()) && d2.getUTCFullYear() > 1990) {
+        var y2=d2.getUTCFullYear(),m2=String(d2.getUTCMonth()+1).padStart(2,'0'),day2=String(d2.getUTCDate()).padStart(2,'0');
+        return y2+'-'+m2+'-'+day2;
       }
     }
+    if (val.includes('T')) {
+      var d3 = new Date(val);
+      if (!isNaN(d3.getTime())) {
+        var y3=d3.getFullYear(),m3=String(d3.getMonth()+1).padStart(2,'0'),day3=String(d3.getDate()).padStart(2,'0');
+        return y3+'-'+m3+'-'+day3;
+      }
+    }
+    // 已是 YYYY-MM-DD 格式
     return val.slice(0, 10);
   }
   return String(val).slice(0, 10);
