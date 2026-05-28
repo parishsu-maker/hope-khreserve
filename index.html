@@ -172,6 +172,10 @@ tr:hover td{background:#FAFAFA}
 .export-card{background:#F7F7F7;border-radius:8px;padding:1rem;margin-bottom:1rem}
 .filter-bar{display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;align-items:flex-end}
 
+/* 時段自填欄位動畫 */
+.time-other-wrap{display:none;flex-direction:column;gap:4px}
+.time-other-wrap.show{display:flex}
+
 /* finance-only welcome */
 .finance-welcome{text-align:center;padding:3rem 1rem}
 .finance-welcome .fw-icon{font-size:48px;margin-bottom:1rem;color:#F59E0B}
@@ -337,7 +341,25 @@ tr:hover td{background:#FAFAFA}
           <div class="form-row" style="margin-bottom:0">
             <div class="fg"><label>登記教練</label><select id="short-coach"><option value="">— 請選擇 —</option></select></div>
             <div class="fg"><label>日期</label><input type="date" id="short-date"></div>
-            <div class="fg"><label>時段（自行填寫）</label><input type="text" id="short-time" placeholder="例：14:00–15:00"></div>
+            <!-- ★ 時段下拉選單 -->
+            <div class="fg">
+              <label>時段</label>
+              <select id="short-time-select" onchange="onShortTimeChange()">
+                <option value="">— 請選擇時段 —</option>
+                <option value="12:00–13:00">12:00–13:00</option>
+                <option value="13:00–14:00">13:00–14:00</option>
+                <option value="14:00–15:00">14:00–15:00</option>
+                <option value="15:00–16:00">15:00–16:00</option>
+                <option value="16:00–17:00">16:00–17:00</option>
+                <option value="17:00–18:00">17:00–18:00</option>
+                <option value="other">其他時段</option>
+              </select>
+            </div>
+            <!-- ★ 其他時段自填欄位（預設隱藏） -->
+            <div class="fg time-other-wrap" id="short-time-other-wrap">
+              <label>自行填寫時段</label>
+              <input type="text" id="short-time-other" placeholder="例：18:00–19:00">
+            </div>
           </div>
         </div>
         <div class="divider"></div>
@@ -540,7 +562,6 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbwz47KEU8iWvcIHA-aiNltQ
 let isOnline = false;
 let syncStatus = 'init';
 
-// ---- API 呼叫 (JSONP，相容 Safari ITP) ----
 function gasCall(params) {
   return new Promise((resolve) => {
     if (!GAS_URL) { resolve(null); return; }
@@ -571,7 +592,6 @@ function gasCall(params) {
   });
 }
 
-// ===== 日期正規化：把任何格式都轉成 YYYY-MM-DD (本地時區) =====
 function normalizeDate(val) {
   if (!val) return '';
   if (val instanceof Date) {
@@ -592,13 +612,11 @@ function normalizeDate(val) {
   return String(val).slice(0, 10);
 }
 
-// ---- 從 Sheets 載入全部資料 ----
 async function loadFromSheets() {
   setSyncStatus('loading');
   const data = await gasCall({ action: 'loadAll' });
   if (!data) { setSyncStatus('error'); return false; }
 
-  // ★ 修正重點：所有日期欄位都做 normalizeDate，避免 Google Sheets 時區問題
   if (data.regs !== undefined && data.regs !== null) {
     registrations = Array.isArray(data.regs)
       ? data.regs.map(r => ({ ...r, date: normalizeDate(r.date) }))
@@ -613,7 +631,6 @@ async function loadFromSheets() {
     students = Array.isArray(data.students) ? data.students : students;
   }
   if (data.rosters !== undefined && data.rosters !== null && typeof data.rosters === 'object') {
-    // 排班的 key 也可能是 ISO 時間戳，要正規化
     const normalized = {};
     Object.entries(data.rosters).forEach(([k, v]) => {
       normalized[normalizeDate(k)] = v;
@@ -636,7 +653,6 @@ async function loadFromSheets() {
     if (s.shortRate) shortRate = Number(s.shortRate);
   }
 
-  // 同時存 localStorage 作快取
   sv('v3_regs', registrations); sv('v3_shortRegs', shortRegs);
   sv('v3_students', students);  sv('v3_rosters', rosters);
   sv('v3_closed', closedDates); sv('v3_coaches', coaches);
@@ -648,7 +664,6 @@ async function loadFromSheets() {
   return true;
 }
 
-// ---- 儲存到 Sheets ----
 async function saveToSheets(type) {
   if (!GAS_URL || !isOnline) return;
   setSyncStatus('saving');
@@ -665,7 +680,6 @@ async function saveToSheets(type) {
   setSyncStatus(result ? 'ok' : 'error');
 }
 
-// ---- 同步狀態顯示 ----
 function setSyncStatus(status) {
   syncStatus = status;
   const el = document.getElementById('sync-status');
@@ -718,7 +732,7 @@ let shortRegs=ld('v3_shortRegs',[]);
 let rosters=ld('v3_rosters',{}),closedDates=ld('v3_closed',{});
 let selectedStudentId=null,isNewStudent=false;
 let shortSelectedStudentId=null,shortIsNewStudent=false;
-let currentWeekStart=null; // initialized after helpers are defined
+let currentWeekStart=null;
 let rescheduleTargetId=null,exportMode='month';
 let currentRole=null;
 
@@ -976,8 +990,33 @@ function initShortPage(){
   const dateEl=document.getElementById('short-date'),notice=document.getElementById('short-admin-notice');
   if(currentRole==='admin'){dateEl.removeAttribute('min');notice.style.display='none';dateEl.value=todayISO();}
   else{dateEl.min=todayISO();dateEl.value=todayISO();notice.style.display='flex';}
+  // 重置時段欄位
+  document.getElementById('short-time-select').value='';
+  document.getElementById('short-time-other').value='';
+  document.getElementById('short-time-other-wrap').classList.remove('show');
   calcShortFee();renderShortTable();resetShortFields();
 }
+
+// ★ 時段下拉切換
+function onShortTimeChange(){
+  const val=document.getElementById('short-time-select').value;
+  const wrap=document.getElementById('short-time-other-wrap');
+  if(val==='other'){
+    wrap.classList.add('show');
+    document.getElementById('short-time-other').focus();
+  }else{
+    wrap.classList.remove('show');
+    document.getElementById('short-time-other').value='';
+  }
+}
+
+// ★ 取得最終時段值
+function getShortTime(){
+  const sel=document.getElementById('short-time-select').value;
+  if(sel==='other')return document.getElementById('short-time-other').value.trim();
+  return sel;
+}
+
 function calcShortFee(){const count=parseInt(document.getElementById('short-count')?.value||1);document.getElementById('short-fee-display').value='NT$ '+(shortRate*count).toLocaleString()}
 function onShortStuNameInput(){
   const name=document.getElementById('short-stu-name').value.trim();
@@ -995,8 +1034,12 @@ function onShortStuNameInput(){
 function selectShortExistingStu(id,name){shortSelectedStudentId=id;shortIsNewStudent=false;document.getElementById('short-stu-name').value=name;document.getElementById('short-similar-box').classList.remove('show');document.getElementById('short-new-student-box').classList.remove('show');const s=students.find(st=>st.id===id);const info=document.getElementById('short-existing-stu-info');info.style.display='block';info.innerHTML=`<span class="tag tag-blue" style="margin-right:8px">已選擇</span><strong>${s.name}</strong>`}
 function confirmShortNewStudent(){document.getElementById('short-similar-box').classList.remove('show');shortIsNewStudent=true;document.getElementById('short-new-student-box').classList.add('show')}
 function resetShortFields(){shortSelectedStudentId=null;shortIsNewStudent=false;document.getElementById('short-stu-name').value='';document.getElementById('short-similar-box').classList.remove('show');document.getElementById('short-new-student-box').classList.remove('show');document.getElementById('short-existing-stu-info').style.display='none'}
+
 function submitShort(){
-  const coach=document.getElementById('short-coach').value,date=document.getElementById('short-date').value,time=document.getElementById('short-time').value.trim(),stuName=document.getElementById('short-stu-name').value.trim();
+  const coach=document.getElementById('short-coach').value,
+        date=document.getElementById('short-date').value,
+        time=getShortTime(),  // ★ 使用新函式取得時段
+        stuName=document.getElementById('short-stu-name').value.trim();
   const count=parseInt(document.getElementById('short-count').value),note=document.getElementById('short-note').value.trim();
   const al=document.getElementById('short-alert');
   if(currentRole!=='admin'&&date<todayISO()){al.className='alert alert-danger';al.textContent='⛔ 不可選擇過去日期';return}
@@ -1011,7 +1054,17 @@ function submitShort(){
   resetShortFields();document.getElementById('short-note').value='';renderShortTable();renderSchedule();renderStudents();
   setTimeout(()=>{al.className='alert'},4000);
 }
-function clearShort(){resetShortFields();document.getElementById('short-note').value='';calcShortFee()}
+
+// ★ clearShort 加入時段重置
+function clearShort(){
+  resetShortFields();
+  document.getElementById('short-note').value='';
+  document.getElementById('short-time-select').value='';
+  document.getElementById('short-time-other').value='';
+  document.getElementById('short-time-other-wrap').classList.remove('show');
+  calcShortFee();
+}
+
 function deleteShort(id){if(!confirm('確定刪除？'))return;shortRegs=shortRegs.filter(r=>r.id!==id);sv('v3_shortRegs',shortRegs);saveToSheets('shortRegs');renderShortTable();renderSchedule();renderStudents()}
 function renderShortTable(){
   const tbody=document.getElementById('short-tbody');if(!tbody)return;
