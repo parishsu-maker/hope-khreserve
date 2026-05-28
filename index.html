@@ -1,3 +1,4 @@
+OK: login flow replaced
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -225,6 +226,10 @@ tr:hover td{background:#FAFAFA}
       <div id="password-error" style="color:#EF4444;font-size:12px;margin-top:6px;display:none">密碼錯誤，請再試一次</div>
     </div>
     <button class="login-btn" id="login-btn" onclick="doLogin()" disabled>進入系統</button>
+    <div id="login-loading" style="display:none;text-align:center;padding:12px 0;font-size:13px;color:#6B9E8F">
+      <span style="display:inline-block;animation:spin 1s linear infinite;margin-right:6px">⟳</span>連線中，請稍候…
+    </div>
+    <style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>
     <div class="login-hint">元木運動內部系統 · 僅限授權人員使用</div>
   </div>
 </div>
@@ -564,6 +569,7 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbwz47KEU8iWvcIHA-aiNltQ
 let isOnline = false;
 let syncStatus = 'init';
 
+// ---- JSONP 單次呼叫（timeout 12秒）----
 function gasCall(params) {
   return new Promise((resolve) => {
     if (!GAS_URL) { resolve(null); return; }
@@ -572,9 +578,7 @@ function gasCall(params) {
       const allParams = Object.assign({}, params, { callback: cbName });
       const url = GAS_URL + '?' + new URLSearchParams(allParams).toString();
       const script = document.createElement('script');
-      const timer = setTimeout(() => {
-        cleanup(); console.error('GAS timeout'); resolve(null);
-      }, 15000);
+      const timer = setTimeout(() => { cleanup(); resolve(null); }, 12000);
       function cleanup() {
         clearTimeout(timer);
         delete window[cbName];
@@ -582,16 +586,49 @@ function gasCall(params) {
       }
       window[cbName] = function(json) {
         cleanup();
-        if (json && json.ok) resolve(json.data);
-        else { console.error('GAS error:', json); resolve(null); }
+        resolve((json && json.ok) ? json.data : null);
       };
-      script.onerror = function() { cleanup(); console.error('GAS script error'); resolve(null); };
+      script.onerror = function() { cleanup(); resolve(null); };
       script.src = url;
       document.head.appendChild(script);
-    } catch(e) {
-      console.error('GAS call error:', e); resolve(null);
-    }
+    } catch(e) { resolve(null); }
   });
+}
+
+// ---- Save Queue：序列化所有儲存請求，避免並發互蓋 ----
+let _saveQueue = Promise.resolve();
+let _pendingSave = {}; // 去重：同一 type 只保留最新一筆
+
+function saveToSheets(type) {
+  // 記錄最新要存的 type（去重複排程）
+  _pendingSave[type] = true;
+  _saveQueue = _saveQueue.then(() => _flushSave(type));
+}
+
+async function _flushSave(type) {
+  if (!GAS_URL || !isOnline) return;
+  if (!_pendingSave[type]) return; // 已被更新的請求取代，跳過
+  delete _pendingSave[type];
+  setSyncStatus('saving');
+  let payload;
+  if (type === 'regs')      payload = { action: 'saveRegs',      data: JSON.stringify(registrations) };
+  if (type === 'shortRegs') payload = { action: 'saveShortRegs', data: JSON.stringify(shortRegs) };
+  if (type === 'students')  payload = { action: 'saveStudents',  data: JSON.stringify(students) };
+  if (type === 'rosters')   payload = { action: 'saveRosters',   data: JSON.stringify(rosters) };
+  if (type === 'closed')    payload = { action: 'saveClosed',    data: JSON.stringify(closedDates) };
+  if (type === 'settings')  payload = { action: 'saveSettings',  data: JSON.stringify({
+    coaches: JSON.stringify(coaches), feeTypes: JSON.stringify(feeTypes),
+    coachFees: JSON.stringify(coachFees), khRate, shortRate
+  })};
+  if (!payload) return;
+  // 最多重試 2 次
+  let result = null;
+  for (let i = 0; i < 2; i++) {
+    result = await gasCall(payload);
+    if (result) break;
+    await new Promise(r => setTimeout(r, 1500)); // 等 1.5 秒再重試
+  }
+  setSyncStatus(result ? 'ok' : 'error');
 }
 
 function normalizeDate(val) {
@@ -666,21 +703,7 @@ async function loadFromSheets() {
   return true;
 }
 
-async function saveToSheets(type) {
-  if (!GAS_URL || !isOnline) return;
-  setSyncStatus('saving');
-  let result;
-  if (type === 'regs')      result = await gasCall({ action: 'saveRegs',      data: JSON.stringify(registrations) });
-  if (type === 'shortRegs') result = await gasCall({ action: 'saveShortRegs', data: JSON.stringify(shortRegs) });
-  if (type === 'students')  result = await gasCall({ action: 'saveStudents',  data: JSON.stringify(students) });
-  if (type === 'rosters')   result = await gasCall({ action: 'saveRosters',   data: JSON.stringify(rosters) });
-  if (type === 'closed')    result = await gasCall({ action: 'saveClosed',    data: JSON.stringify(closedDates) });
-  if (type === 'settings')  result = await gasCall({ action: 'saveSettings',  data: JSON.stringify({
-    coaches: JSON.stringify(coaches), feeTypes: JSON.stringify(feeTypes),
-    coachFees: JSON.stringify(coachFees), khRate, shortRate
-  })});
-  setSyncStatus(result ? 'ok' : 'error');
-}
+
 
 function setSyncStatus(status) {
   syncStatus = status;
@@ -724,7 +747,7 @@ const DEF_FEES=[{name:'單堂',amount:3000},{name:'個人套組 第一堂',amoun
 const DEF_COACH_FEE=1000,DEF_KH=1100,DEF_SHORT=500;
 const DOWS=['日','一','二','三','四','五','六'];
 
-function ld(k,d){try{const v=localStorage.getItem(k);if(!v)return d;const p=JSON.parse(v);if(Array.isArray(d)&&Array.isArray(p)&&p.length===0)return d;return p}catch(e){return d}}
+function ld(k,d){try{const v=localStorage.getItem(k);if(v===null||v===undefined)return d;const p=JSON.parse(v);return p;}catch(e){return d}}
 function sv(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 
 let coaches=Array.isArray(ld('v3_coaches',DEF_COACHES))?ld('v3_coaches',DEF_COACHES):DEF_COACHES,feeTypes=ld('v3_feeTypes',DEF_FEES),coachFees=ld('v3_coachFees',{});
@@ -780,8 +803,6 @@ function doLogin(){
 }
 function _doLoginContinue(){
   if(!currentRole)return;
-  document.getElementById('login-screen').style.display='none';
-  document.getElementById('app').style.display='block';
   const badge=document.getElementById('role-badge');
   badge.textContent=ROLE_LABELS[currentRole];
   badge.className='topbar-role '+ROLE_BADGE_CLASS[currentRole];
@@ -789,23 +810,29 @@ function _doLoginContinue(){
   if(urlBtn)urlBtn.style.display=currentRole==='admin'?'inline-flex':'none';
   document.getElementById('topbar-date').textContent=new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric'});
   buildNav();
-  const firstPage=getAllowedPages()[0];
-  if(firstPage)goPage(firstPage);
+  const loadingEl=document.getElementById('login-loading');
+  const loginBtnEl=document.getElementById('login-btn');
   if(GAS_URL){
+    // 顯示 loading，禁用按鈕防止重複點擊
+    if(loadingEl)loadingEl.style.display='block';
+    if(loginBtnEl)loginBtnEl.disabled=true;
     setSyncStatus('loading');
     loadFromSheets().then(ok=>{
-      if(ok){
-        // 資料載入完成後，強制重新渲染所有已開啟的頁面
-        fillSel('sch-coach',true);
-        renderSchedule();
-        renderRegTable();
-        renderShortTable();
-      }else{
-        setSyncStatus('error');
-        refreshCurrentPage();
-      }
+      if(loadingEl)loadingEl.style.display='none';
+      isOnline = !!ok;
+      if(!ok) setSyncStatus('error');
+      document.getElementById('login-screen').style.display='none';
+      document.getElementById('app').style.display='block';
+      const firstPage=getAllowedPages()[0];
+      if(firstPage)goPage(firstPage);
     });
-  }else{setSyncStatus('offline');refreshCurrentPage();}
+  }else{
+    setSyncStatus('offline');
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app').style.display='block';
+    const firstPage=getAllowedPages()[0];
+    if(firstPage)goPage(firstPage);
+  }
 }
 function doLogout(){
   document.getElementById('app').style.display='none';
