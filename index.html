@@ -803,6 +803,10 @@ function doLogin(){
 }
 function _doLoginContinue(){
   if(!currentRole)return;
+
+  // 先切換畫面、設定身份，讓使用者立刻看到系統
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').style.display='block';
   const badge=document.getElementById('role-badge');
   badge.textContent=ROLE_LABELS[currentRole];
   badge.className='topbar-role '+ROLE_BADGE_CLASS[currentRole];
@@ -810,28 +814,26 @@ function _doLoginContinue(){
   if(urlBtn)urlBtn.style.display=currentRole==='admin'?'inline-flex':'none';
   document.getElementById('topbar-date').textContent=new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric'});
   buildNav();
-  const loadingEl=document.getElementById('login-loading');
-  const loginBtnEl=document.getElementById('login-btn');
+
+  // 先用 localStorage 快取渲染，讓頁面立刻有內容
+  const firstPage=getAllowedPages()[0];
+  if(firstPage)goPage(firstPage);
+
+  // 背景同步 Sheets（不阻擋操作）
   if(GAS_URL){
-    // 顯示 loading，禁用按鈕防止重複點擊
-    if(loadingEl)loadingEl.style.display='block';
-    if(loginBtnEl)loginBtnEl.disabled=true;
     setSyncStatus('loading');
     loadFromSheets().then(ok=>{
-      if(loadingEl)loadingEl.style.display='none';
-      isOnline = !!ok;
-      if(!ok) setSyncStatus('error');
-      document.getElementById('login-screen').style.display='none';
-      document.getElementById('app').style.display='block';
-      const firstPage=getAllowedPages()[0];
-      if(firstPage)goPage(firstPage);
+      isOnline=!!ok;
+      if(!ok){setSyncStatus('error');return;}
+      // 資料載入完成，重新渲染當前頁面
+      const activePage=document.querySelector('.page.active');
+      if(activePage){
+        const id=activePage.id.replace('page-','');
+        goPage(id);
+      }
     });
   }else{
     setSyncStatus('offline');
-    document.getElementById('login-screen').style.display='none';
-    document.getElementById('app').style.display='block';
-    const firstPage=getAllowedPages()[0];
-    if(firstPage)goPage(firstPage);
   }
 }
 function doLogout(){
