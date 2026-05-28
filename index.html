@@ -857,7 +857,16 @@ function syncCoachHours(){const c=parseInt(document.getElementById('reg-count')?
 // ===== SCHEDULE =====
 function shiftWeek(n){currentWeekStart=addDays(currentWeekStart,n*7);renderSchedule()}
 function goThisWeek(){currentWeekStart=getWeekStart(new Date());renderSchedule()}
-function initSchedulePage(){fillSel('sch-coach',true);renderSchedule()}
+function initSchedulePage(){
+  fillSel('sch-coach',true);
+  if(GAS_URL&&isOnline){
+    setSyncStatus('loading');
+    loadFromSheets().then(ok=>{
+      if(ok){fillSel('sch-coach',true);}
+      renderSchedule();
+    });
+  }else{renderSchedule();}
+}
 function renderSchedule(){
   fillSel('sch-coach',true);
   const fc=document.getElementById('sch-coach')?.value||'';
@@ -1137,7 +1146,7 @@ function onRosterDateChange(date){
   if(isClosed(date)){warn.classList.add('show');saveBtn.disabled=true;saveBtn.style.opacity='.4';document.querySelectorAll('.coach-cb').forEach(el=>el.classList.add('disabled'))}
   else{warn.classList.remove('show');saveBtn.disabled=false;saveBtn.style.opacity='1';document.querySelectorAll('.coach-cb').forEach(el=>el.classList.remove('disabled'));const existing=rosters[date]||[];document.querySelectorAll('.coach-cb input').forEach(cb=>{cb.checked=existing.includes(cb.value);updateCbStyle(cb.value)})}
 }
-function saveRoster(){const date=document.getElementById('roster-date').value;if(!date||isClosed(date))return;rosters[date]=Array.from(document.querySelectorAll('.coach-cb input:checked')).map(cb=>cb.value);sv('v3_rosters',rosters);saveToSheets('rosters');const msg=document.getElementById('roster-saved');msg.style.display='inline';setTimeout(()=>msg.style.display='none',2000);renderRosterTable()}
+function saveRoster(){const date=document.getElementById('roster-date').value;if(!date||isClosed(date))return;rosters[date]=Array.from(document.querySelectorAll('.coach-cb input:checked')).map(cb=>cb.value);sv('v3_rosters',rosters);saveToSheets('rosters');const msg=document.getElementById('roster-saved');msg.style.display='inline';setTimeout(()=>msg.style.display='none',2000);renderRosterTable();renderSchedule();}
 function addClosedDate(){const date=document.getElementById('closed-date').value,reason=document.getElementById('closed-reason').value.trim();if(!date)return;closedDates[date]={reason};sv('v3_closed',closedDates);saveToSheets('closed');document.getElementById('closed-reason').value='';renderClosedList();renderRosterTable();if(document.getElementById('roster-date').value===date)onRosterDateChange(date)}
 function removeClosedDate(date){delete closedDates[date];sv('v3_closed',closedDates);saveToSheets('closed');renderClosedList();renderRosterTable();if(document.getElementById('roster-date').value===date)onRosterDateChange(date)}
 function renderClosedList(){const el=document.getElementById('closed-list'),dates=Object.keys(closedDates).sort();if(!dates.length){el.innerHTML='<div style="font-size:13px;color:#9CA3AF">尚無封場日期</div>';return}el.innerHTML=dates.map(d=>`<div class="si" style="padding:6px 0"><div><span class="tag tag-red" style="margin-right:6px">${d}</span><span style="font-size:12px;color:#888">${closedDates[d].reason||'—'}</span></div><button class="btn btn-danger btn-sm" onclick="removeClosedDate('${d}')">刪除</button></div>`).join('')}
