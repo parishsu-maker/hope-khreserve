@@ -742,11 +742,11 @@ async function loadFromSheets() {
   // 系統設定：永遠以 Sheets 為主
   if (data.settings) {
     const s = data.settings;
-    if (s.coaches)   try { coaches   = JSON.parse(s.coaches);   } catch(e) {}
-    if (s.feeTypes)  try { feeTypes  = JSON.parse(s.feeTypes);  } catch(e) {}
-    if (s.coachFees) try { coachFees = JSON.parse(s.coachFees); } catch(e) {}
-    if (s.khRate)    khRate    = Number(s.khRate);
-    if (s.shortRate) shortRate = Number(s.shortRate);
+    if (s.coaches)   { try { const p=JSON.parse(s.coaches);   if(Array.isArray(p))   coaches   = p; } catch(e) {} }
+    if (s.feeTypes)  { try { const p=JSON.parse(s.feeTypes);  if(Array.isArray(p))   feeTypes  = p; } catch(e) {} }
+    if (s.coachFees) { try { const p=JSON.parse(s.coachFees); if(p&&typeof p==='object') coachFees = p; } catch(e) {} }
+    if (s.khRate)    { const n=Number(s.khRate);    if(!isNaN(n)&&n>0) khRate    = n; }
+    if (s.shortRate) { const n=Number(s.shortRate); if(!isNaN(n)&&n>0) shortRate = n; }
   }
 
   sv('v3_regs', registrations); sv('v3_shortRegs', shortRegs);
@@ -804,7 +804,17 @@ const DEF_FEES=[{name:'單堂',amount:3000},{name:'個人套組 第一堂',amoun
 const DEF_COACH_FEE=1000,DEF_KH=1100,DEF_SHORT=500;
 const DOWS=['日','一','二','三','四','五','六'];
 
-function ld(k,d){try{const v=localStorage.getItem(k);if(v===null||v===undefined)return d;const p=JSON.parse(v);return p;}catch(e){return d}}
+function ld(k,d){
+  try{
+    const v=localStorage.getItem(k);
+    if(v===null||v===undefined)return d;
+    const p=JSON.parse(v);
+    // 型態保護：期望陣列就要是陣列，期望數字就要是數字
+    if(Array.isArray(d)&&!Array.isArray(p))return d;
+    if(typeof d==='number'&&isNaN(Number(p)))return d;
+    return p;
+  }catch(e){return d}
+}
 function sv(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 
 let coaches=Array.isArray(ld('v3_coaches',DEF_COACHES))?ld('v3_coaches',DEF_COACHES):DEF_COACHES,feeTypes=ld('v3_feeTypes',DEF_FEES),coachFees=ld('v3_coachFees',{});
@@ -958,6 +968,11 @@ function similarity(a,b){a=a.toLowerCase();b=b.toLowerCase();if(a===b)return 1;i
 function findSimilar(name){return students.filter(s=>similarity(s.name,name)>0.4&&s.name!==name)}
 function fmtTime(ts){if(!ts)return '';const d=new Date(Number(ts));if(isNaN(d.getTime()))return '';return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0')}
 function fillSel(id,withAll){const el=document.getElementById(id);if(!el)return;const cur=el.value;el.innerHTML=withAll?'<option value="">全部</option>':'<option value="">— 請選擇 —</option>';const list=(Array.isArray(coaches)&&coaches.length>0)?coaches:DEF_COACHES;list.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;el.appendChild(o)});if(cur)el.value=cur;}
+function ensureArrays(){
+  if(!Array.isArray(coaches))   coaches   = DEF_COACHES;
+  if(!Array.isArray(feeTypes))  feeTypes  = DEF_FEES;
+  if(!coachFees||typeof coachFees!=='object'||Array.isArray(coachFees)) coachFees = {};
+}
 function syncCoachHours(){const c=parseInt((document.getElementById('reg-count')||{}).value||1);document.getElementById('preview-coach-hours').value=c+' 人次'}
 
 // ===== SCHEDULE =====
@@ -1008,6 +1023,7 @@ function renderSchedule(){
 
 // ===== REGISTER =====
 function initRegPage(){
+  ensureArrays();
   fillSel('reg-self-coach',false);fillSel('sch-coach',true);fillSel('fin-coach',true);
   const fe=document.getElementById('reg-fee-type');fe.innerHTML='';
   feeTypes.forEach(ft=>{const o=document.createElement('option');o.value=ft.name;o.textContent=ft.name;fe.appendChild(o)});
@@ -1273,6 +1289,7 @@ function downloadExcel(mode){
   XLSX.writeFile(wb,'國華報名_'+label+'.xlsx');
 }
 function renderFinance(){
+  ensureArrays();
   fillSel('fin-coach',true);
   const month=(document.getElementById('fin-month')||{}).value||'',fc=(document.getElementById('fin-coach')||{}).value||'';
   let regs=registrations;if(month)regs=regs.filter(r=>r.date.startsWith(month));if(fc)regs=regs.filter(r=>r.coach===fc);
@@ -1301,6 +1318,7 @@ function renderFinance(){
 
 // ===== SETTINGS =====
 function renderSettings(){
+  ensureArrays();
   document.getElementById('kh-rate').value=khRate;document.getElementById('short-rate').value=shortRate;
   document.getElementById('coach-list-ui').innerHTML=coaches.map((c,i)=>`<div class="si"><div class="ilfx"><span class="avatar">${c.slice(0,2)}</span><span>${c}</span></div><button class="btn btn-danger btn-sm" onclick="removeCoach(${i})">移除</button></div>`).join('');
   document.getElementById('fee-types-ui').innerHTML=feeTypes.length
