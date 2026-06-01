@@ -1279,7 +1279,31 @@ function renderSettings(){
 }
 function addCoach(){const n=document.getElementById('new-coach').value.trim();if(!n||coaches.includes(n))return;coaches.push(n);sv('v3_coaches',coaches);saveToSheets('settings');document.getElementById('new-coach').value='';renderSettings()}
 function removeCoach(i){coaches.splice(i,1);sv('v3_coaches',coaches);saveToSheets('settings');renderSettings()}
-function addFeeType(){const n=document.getElementById('new-fee-name').value.trim(),a=parseInt(document.getElementById('new-fee-amt').value);if(!n||isNaN(a))return;feeTypes.push({name:n,amount:a});sv('v3_feeTypes',feeTypes);saveToSheets('settings');document.getElementById('new-fee-name').value='';document.getElementById('new-fee-amt').value='';renderSettings()}
+function addFeeType(){
+  const nameEl=document.getElementById('new-fee-name');
+  const amtEl=document.getElementById('new-fee-amt');
+  const n=nameEl.value.trim();
+  const a=parseInt(amtEl.value);
+  if(!n){
+    nameEl.style.borderColor='#EF4444';
+    nameEl.placeholder='請輸入訂單名稱';
+    nameEl.focus();
+    setTimeout(()=>{nameEl.style.borderColor='';},2000);
+    return;
+  }
+  if(isNaN(a)||a<0){
+    amtEl.style.borderColor='#EF4444';
+    amtEl.focus();
+    setTimeout(()=>{amtEl.style.borderColor='';},2000);
+    return;
+  }
+  feeTypes.push({name:n,amount:a});
+  sv('v3_feeTypes',feeTypes);
+  saveToSheets('settings');
+  nameEl.value='';
+  amtEl.value='';
+  renderSettings();
+}
 function removeFeeType(i){feeTypes.splice(i,1);sv('v3_feeTypes',feeTypes);saveToSheets('settings');renderSettings()}
 function updateFeeAmt(i,v){feeTypes[i].amount=parseInt(v)||0;sv('v3_feeTypes',feeTypes)}
 function updateCoachFee(c,v){coachFees[c]=parseInt(v)||0;sv('v3_coachFees',coachFees)}
