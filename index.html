@@ -673,54 +673,73 @@ async function loadFromSheets() {
   const data = await gasCall({ action: 'loadAll' });
   if (!data) { setSyncStatus('error'); return false; }
 
-  // merge 函式：以本機 id 為準，Sheets 有但本機沒有的才補入
-  // 這樣即使 save 還在進行中，剛報名的資料也不會被舊資料洗掉
-  function mergeById(localArr, remoteArr, dateField) {
+  // 日期驗證：年份必須 >= 2020
+  function validDate(d) {
+    return typeof d === 'string' && d.length === 10 && parseInt(d.slice(0,4)) >= 2020;
+  }
+
+  // merge by id：本機已有的保留，Sheets 有但本機沒有的補入
+  function mergeById(localArr, remoteArr) {
     if (!Array.isArray(remoteArr)) return localArr;
     const localIds = new Set(localArr.map(r => r.id));
-    const merged = [...localArr];
-    remoteArr.forEach(r => {
-      if (!localIds.has(r.id)) {
-        if (dateField) r[dateField] = normalizeDate(r[dateField]);
-        merged.push(r);
-      }
-    });
-    return merged;
+    const result = [...localArr];
+    remoteArr.forEach(r => { if (!localIds.has(r.id)) result.push(r); });
+    return result;
   }
 
-  // 驗證日期是否合理（年份必須 >= 2020）
-  function validDate(d) {
-    return d && d.length === 10 && parseInt(d.slice(0,4)) >= 2020;
-  }
-
+  // 下場班報名
   if (Array.isArray(data.regs)) {
     const remote = data.regs
       .map(r => ({ ...r, date: normalizeDate(r.date) }))
       .filter(r => validDate(r.date));
-    registrations = mergeById(registrations, remote, null);
+    registrations = mergeById(registrations, remote);
   }
+
+  // 短桿果嶺報名
   if (Array.isArray(data.shortRegs)) {
     const remote = data.shortRegs
       .map(r => ({ ...r, date: normalizeDate(r.date) }))
       .filter(r => validDate(r.date));
-    shortRegs = mergeById(shortRegs, remote, null);
+    shortRegs = mergeById(shortRegs, remote);
   }
+
+  // 學員：merge by id
   if (Array.isArray(data.students)) {
     const localIds = new Set(students.map(s => s.id));
     data.students.forEach(s => { if (!localIds.has(s.id)) students.push(s); });
   }
+
+  // 排班：Sheets 為主（行政端設定），normalizeDate 後去重，丟掉年份錯的
   if (data.rosters && typeof data.rosters === 'object') {
+    const merged = {};
+    // 先放本機
+    Object.entries(rosters).forEach(([k, v]) => {
+      const d = normalizeDate(k);
+      if (validDate(d)) merged[d] = v;
+    });
+    // Sheets 蓋過本機（排班以行政 Sheets 為準）
     Object.entries(data.rosters).forEach(([k, v]) => {
       const d = normalizeDate(k);
-      if (d && !rosters[d]) rosters[d] = v;
+      if (validDate(d)) merged[d] = v;
     });
+    rosters = merged;
   }
+
+  // 封場：同上，Sheets 為主
   if (data.closed && typeof data.closed === 'object') {
+    const merged = {};
+    Object.entries(closedDates).forEach(([k, v]) => {
+      const d = normalizeDate(k);
+      if (validDate(d)) merged[d] = v;
+    });
     Object.entries(data.closed).forEach(([k, v]) => {
       const d = normalizeDate(k);
-      if (d && !closedDates[d]) closedDates[d] = v;
+      if (validDate(d)) merged[d] = v;
     });
+    closedDates = merged;
   }
+
+  // 系統設定：永遠以 Sheets 為主
   if (data.settings) {
     const s = data.settings;
     if (s.coaches)   try { coaches   = JSON.parse(s.coaches);   } catch(e) {}
