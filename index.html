@@ -901,7 +901,17 @@ function goPage(name){
   if(name==='students')renderStudents();
   if(name==='roster')initRoster();
   if(name==='finance')renderFinance();
-  if(name==='settings')renderSettings();
+  if(name==='settings'){
+    if(GAS_URL&&isOnline){
+      setSyncStatus('loading');
+      loadFromSheets().then(ok=>{
+        if(ok) setSyncStatus('ok');
+        renderSettings();
+      });
+    } else {
+      renderSettings();
+    }
+  }
 }
 
 // ===== HELPERS =====
@@ -1274,7 +1284,9 @@ function renderFinance(){
 function renderSettings(){
   document.getElementById('kh-rate').value=khRate;document.getElementById('short-rate').value=shortRate;
   document.getElementById('coach-list-ui').innerHTML=coaches.map((c,i)=>`<div class="si"><div class="ilfx"><span class="avatar">${c.slice(0,2)}</span><span>${c}</span></div><button class="btn btn-danger btn-sm" onclick="removeCoach(${i})">移除</button></div>`).join('');
-  document.getElementById('fee-types-ui').innerHTML=feeTypes.map((ft,i)=>`<div class="si"><span>${ft.name}</span><div class="ilfx"><input type="number" value="${ft.amount}" onchange="updateFeeAmt(${i},this.value)" style="width:90px;text-align:right;padding:5px 8px;border:1px solid #E0E0E0;border-radius:6px;font-family:'Noto Sans TC',sans-serif"><button class="btn btn-danger btn-sm" onclick="removeFeeType(${i})">刪除</button></div></div>`).join('');
+  document.getElementById('fee-types-ui').innerHTML=feeTypes.length
+    ? feeTypes.map((ft,i)=>`<div class="si"><span>${ft.name}</span><div class="ilfx"><input type="number" value="${ft.amount}" onchange="updateFeeAmt(${i},this.value)" style="width:90px;text-align:right;padding:5px 8px;border:1px solid #E0E0E0;border-radius:6px;font-family:'Noto Sans TC',sans-serif"><button class="btn btn-danger btn-sm" onclick="removeFeeType(${i})">刪除</button></div></div>`).join('')
+    : '<div style="font-size:13px;color:#9CA3AF;padding:8px 0">載入中…</div>';
   document.getElementById('coach-fee-ui').innerHTML=coaches.map(c=>`<div class="si"><div class="ilfx"><span class="avatar">${c.slice(0,2)}</span><span>${c}</span></div><div class="ilfx"><span style="font-size:12px;color:#888">NT$/人</span><input type="number" value="${getCoachFee(c)}" onchange="updateCoachFee('${c}',this.value)" style="width:90px;text-align:right;padding:5px 8px;border:1px solid #E0E0E0;border-radius:6px;font-family:'Noto Sans TC',sans-serif"></div></div>`).join('');
 }
 function addCoach(){const n=document.getElementById('new-coach').value.trim();if(!n||coaches.includes(n))return;coaches.push(n);sv('v3_coaches',coaches);saveToSheets('settings');document.getElementById('new-coach').value='';renderSettings()}
