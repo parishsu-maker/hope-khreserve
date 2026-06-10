@@ -1077,8 +1077,14 @@ function submitReg(){
   if(isNewStudent){const sess=parseInt(document.getElementById('new-stu-sessions').value)||1;const ns={id:Date.now(),name:stuName,plan:'單堂',totalSessions:sess,source:'auto'};students.push(ns);sv('v3_students',students);saveToSheets('students');stuId=ns.id}
   const taken=registrations.filter(r=>r.date===date&&r.coach===coach).reduce((s,r)=>s+r.count,0);
   if(taken+count>4){al.className='alert alert-warn';al.textContent='⚠️ 加入後超過4人上限';return}
-  const stu=students.find(s=>s.id===stuId),remain=getRemain(stu);
-  if(remain<sessions){al.className='alert alert-warn';al.textContent='⚠️ 學員剩餘堂數不足（剩 '+remain+' 堂）';return}
+  const stu=students.find(s=>s.id===stuId);
+  const remain=getRemain(stu);
+  // 堂數不足時自動補入，不擋報名（學員購買新堂次）
+  if(remain<sessions){
+    stu.totalSessions+=(sessions-remain);
+    sv('v3_students',students);
+    saveToSheets('students');
+  }
   const ft=feeTypes.find(f=>f.name===feeType),now=Date.now();
   registrations.push({id:now,createdAt:now,date,selfCoach,coach,studentId:stuId,studentName:stu.name,count,sessions,level,feeType,note,amount:ft?ft.amount:0,khFee:count*khRate,coachFee:calcLockedCoachFee(coach,count)});
   sv('v3_regs',registrations);saveToSheets('regs');
