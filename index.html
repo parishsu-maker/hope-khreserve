@@ -260,13 +260,11 @@ tr:hover td{background:#FAFAFA}
           <span class="week-label" id="week-label"></span>
           <button class="btn btn-sm" onclick="shiftWeek(1)" style="color:#1A1A1A"><i class="ti ti-chevron-right" style="color:#1A1A1A"></i></button>
           <button class="btn btn-sm" onclick="goThisWeek()" style="color:#1A1A1A">本週</button>
-          <button class="btn btn-sm" onclick="diagRaw()" style="color:#D97706;border-color:#FCD34D">診斷</button>
         </div>
         <div class="fg"><label style="font-size:12px;color:#888">篩選教練</label>
           <select id="sch-coach" onchange="renderSchedule()" style="width:120px"></select></div>
       </div>
       <div id="schedule-content"></div>
-      <pre id="diag-out" style="display:none;background:#FFFBEB;border:1px solid #FCD34D;border-radius:8px;padding:12px;margin-top:8px;font-size:11px;white-space:pre-wrap;word-break:break-all;max-height:400px;overflow:auto"></pre>
     </div>
 
     <!-- 下場班報名 -->
@@ -713,12 +711,18 @@ function normalizeDate(val) {
       var p=val.split('/');
       return p[0]+'-'+String(p[1]).padStart(2,'0')+'-'+String(p[2]).padStart(2,'0');
     }
-    // GAS 的 "Wed Jun 10 2026 00:00:00 GMT+0800..." 格式
-    // 直接從字串抓「月 日 年」，不經過 new Date()，避免時區造成日期偏移
+    // GAS Date 字串格式
     var monthMap={Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+    // 含年份："Wed Jun 10 2026 ..."
     var m4=val.match(/\b([A-Z][a-z]{2})\s+(\d{1,2})\s+(\d{4})\b/);
     if (m4 && monthMap[m4[1]]) {
       return m4[3]+'-'+monthMap[m4[1]]+'-'+String(m4[2]).padStart(2,'0');
+    }
+    // 無年份（被截斷）："Fri May 22" → 用第二參數 fallbackYear 補年份
+    var m5=val.match(/\b([A-Z][a-z]{2})\s+(\d{1,2})\b/);
+    if (m5 && monthMap[m5[1]]) {
+      var yr = (arguments.length>1 && arguments[1]) ? arguments[1] : new Date().getFullYear();
+      return yr+'-'+monthMap[m5[1]]+'-'+String(m5[2]).padStart(2,'0');
     }
     // 其他格式交給 Date 解析（用 UTC 避免偏移）
     var d3 = new Date(val);
@@ -758,10 +762,18 @@ async function loadFromSheets() {
     return result;
   }
 
+  // 用 createdAt 時間戳推算年份，補在被截斷的日期上
+  function yearFromCreatedAt(ts){
+    var n=Number(ts);
+    if(!n||isNaN(n)) return new Date().getFullYear();
+    var d=new Date(n);
+    return isNaN(d.getTime()) ? new Date().getFullYear() : d.getFullYear();
+  }
+
   // 下場班報名 — 以 Sheets 為主
   if (Array.isArray(data.regs)) {
     const remote = data.regs
-      .map(r => ({ ...r, date: normalizeDate(r.date) }))
+      .map(r => ({ ...r, date: normalizeDate(r.date, yearFromCreatedAt(r.createdAt)) }))
       .filter(r => validDate(r.date));
     registrations = mergeRemoteFirst(registrations, remote, _pendingIds.regs);
   }
@@ -769,7 +781,7 @@ async function loadFromSheets() {
   // 短桿果嶺報名 — 以 Sheets 為主
   if (Array.isArray(data.shortRegs)) {
     const remote = data.shortRegs
-      .map(r => ({ ...r, date: normalizeDate(r.date) }))
+      .map(r => ({ ...r, date: normalizeDate(r.date, yearFromCreatedAt(r.createdAt)) }))
       .filter(r => validDate(r.date));
     shortRegs = mergeRemoteFirst(shortRegs, remote, _pendingIds.shortRegs);
   }
@@ -1062,29 +1074,6 @@ function syncCoachHours(){const c=parseInt((document.getElementById('reg-count')
 // ===== SCHEDULE =====
 function shiftWeek(n){currentWeekStart=addDays(currentWeekStart,n*7);renderSchedule()}
 function goThisWeek(){currentWeekStart=getWeekStart(new Date());renderSchedule()}
-async function diagRaw(){
-  const out=document.getElementById('diag-out');
-  out.style.display='block';
-  out.textContent='讀取中...';
-  const data=await gasCall({action:'loadAll'});
-  if(!data){out.textContent='gasCall 回傳 null（連線失敗或無回應）';return;}
-  let s='';
-  s+='regs 筆數: '+(Array.isArray(data.regs)?data.regs.length:'非陣列 '+typeof data.regs)+String.fromCharCode(10);
-  s+='rosters key 數: '+(data.rosters?Object.keys(data.rosters).length:'無')+String.fromCharCode(10);
-  s+='shortRegs 筆數: '+(Array.isArray(data.shortRegs)?data.shortRegs.length:'無')+String.fromCharCode(10);
-  s+='students 筆數: '+(Array.isArray(data.students)?data.students.length:'無')+String.fromCharCode(10);
-  s+=String.fromCharCode(10)+'=== rosters 前3筆（原始 key 與值）==='+String.fromCharCode(10);
-  if(data.rosters){
-    Object.entries(data.rosters).slice(0,3).forEach(function(kv){
-      s+=JSON.stringify(kv[0])+' => '+JSON.stringify(kv[1])+String.fromCharCode(10);
-    });
-  }
-  s+=String.fromCharCode(10)+'=== regs 第1筆原始 ==='+String.fromCharCode(10);
-  if(Array.isArray(data.regs)&&data.regs.length){
-    s+=JSON.stringify(data.regs[0],null,1);
-  }
-  out.textContent=s;
-}
 function initSchedulePage(){fillSel('sch-coach',true);renderSchedule();}
 function renderSchedule(){
   fillSel('sch-coach',true);
