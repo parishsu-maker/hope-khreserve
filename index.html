@@ -654,13 +654,25 @@ function normalizeDate(val) {
         return y2+'-'+m2+'-'+day2;
       }
     }
-    // 已是 YYYY-MM-DD 開頭就直接取前10碼
+    // 已是 YYYY-MM-DD 開頭就直接取前10碼（最常見，優先處理）
     if (/^\d{4}-\d{2}-\d{2}/.test(val)) return val.slice(0, 10);
-    // 其他格式（ISO 含T、"Mon Jun 01 2026..."等）一律交給 Date 解析
+    // 斜線格式 YYYY/MM/DD
+    if (/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(val)) {
+      var p=val.split('/');
+      return p[0]+'-'+String(p[1]).padStart(2,'0')+'-'+String(p[2]).padStart(2,'0');
+    }
+    // GAS 的 "Wed Jun 10 2026 00:00:00 GMT+0800..." 格式
+    // 直接從字串抓「月 日 年」，不經過 new Date()，避免時區造成日期偏移
+    var monthMap={Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+    var m4=val.match(/\b([A-Z][a-z]{2})\s+(\d{1,2})\s+(\d{4})\b/);
+    if (m4 && monthMap[m4[1]]) {
+      return m4[3]+'-'+monthMap[m4[1]]+'-'+String(m4[2]).padStart(2,'0');
+    }
+    // 其他格式交給 Date 解析（用 UTC 避免偏移）
     var d3 = new Date(val);
     if (!isNaN(d3.getTime())) {
-      var y3=d3.getFullYear(),m3=String(d3.getMonth()+1).padStart(2,'0'),day3=String(d3.getDate()).padStart(2,'0');
-      return y3+'-'+m3+'-'+day3;
+      var y3=d3.getUTCFullYear(),mm3=String(d3.getUTCMonth()+1).padStart(2,'0'),day3=String(d3.getUTCDate()).padStart(2,'0');
+      return y3+'-'+mm3+'-'+day3;
     }
     return val.slice(0, 10);
   }
