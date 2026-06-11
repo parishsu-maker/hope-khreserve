@@ -568,15 +568,23 @@ let syncStatus = 'init';
 
 // ---- JSONP 單次呼叫(timeout 12秒)----
 function gasCall(params) {
+  // 先嘗試 JSONP，失敗再用 fetch（雙保險，解決 Safari ITP 擋第三方 script 的問題）
+  return gasCallJSONP(params).then(result => {
+    if (result !== null) return result;
+    return gasCallFetch(params);
+  });
+}
+
+// 方法1：JSONP（相容性高，但 Safari ITP 可能擋）
+function gasCallJSONP(params) {
   return new Promise((resolve) => {
     if (!GAS_URL) { resolve(null); return; }
     try {
       const cbName = 'gcb_' + Date.now() + '_' + Math.floor(Math.random()*10000);
-      // _t 防快取參數：避免 Safari ITP 快取 JSONP 回應導致拿到舊資料
       const allParams = Object.assign({}, params, { callback: cbName, _t: Date.now() + '_' + Math.floor(Math.random()*100000) });
       const url = GAS_URL + '?' + new URLSearchParams(allParams).toString();
       const script = document.createElement('script');
-      const timer = setTimeout(() => { cleanup(); resolve(null); }, 20000);
+      const timer = setTimeout(() => { cleanup(); resolve(null); }, 15000);
       function cleanup() {
         clearTimeout(timer);
         delete window[cbName];
@@ -593,13 +601,50 @@ function gasCall(params) {
   });
 }
 
+// 方法2：fetch（GAS 支援 CORS，Safari 較可靠）
+function gasCallFetch(params) {
+  return new Promise((resolve) => {
+    if (!GAS_URL) { resolve(null); return; }
+    try {
+      const p = Object.assign({}, params, { _t: Date.now() + '_' + Math.floor(Math.random()*100000) });
+      const url = GAS_URL + '?' + new URLSearchParams(p).toString();
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 20000);
+      fetch(url, { method: 'GET', signal: controller.signal, redirect: 'follow' })
+        .then(r => r.text())
+        .then(text => {
+          clearTimeout(timer);
+          // 回應可能是 JSONP 包裝 cb(...) 或純 JSON，兩種都處理
+          let jsonStr = text.trim();
+          const m = jsonStr.match(/^[a-zA-Z0-9_]+\((.*)\)[;\s]*$/s);
+          if (m) jsonStr = m[1];
+          try {
+            const json = JSON.parse(jsonStr);
+            resolve((json && json.ok) ? json.data : null);
+          } catch(e) { resolve(null); }
+        })
+        .catch(() => { clearTimeout(timer); resolve(null); });
+    } catch(e) { resolve(null); }
+  });
+}
+
 // ---- Save Queue:序列化所有儲存請求,避免並發互蓋 ----
 let _saveQueue = Promise.resolve();
 let _pendingSave = {}; // 去重:同一 type 只保留最新一筆
+// 記錄本機剛新增/修改、Sheets 尚未確認的 id，避免同步時被舊資料洗掉
+let _pendingIds = { regs: new Set(), shortRegs: new Set(), students: new Set() };
+// 標記某筆資料為「儲存中」
+function markPending(type){
+  if(!_pendingIds[type]) return;
+  if(type==='regs')      registrations.forEach(r=>_pendingIds.regs.add(r.id));
+  if(type==='shortRegs') shortRegs.forEach(r=>_pendingIds.shortRegs.add(r.id));
+  if(type==='students')  students.forEach(r=>_pendingIds.students.add(r.id));
+}
 
 function saveToSheets(type) {
   // 記錄最新要存的 type(去重複排程)
   _pendingSave[type] = true;
+  markPending(type); // 標記這批資料為儲存中，同步時不被洗掉
   _saveQueue = _saveQueue.then(() => _flushSave(type));
 }
 
@@ -625,6 +670,10 @@ async function _flushSave(type) {
     result = await gasCall(payload);
     if (result) break;
     await new Promise(r => setTimeout(r, 1500)); // 等 1.5 秒再重試
+  }
+  // 儲存成功 → Sheets 已寫入，清除該類型的 pending 標記
+  if (result && _pendingIds[type]) {
+    _pendingIds[type].clear();
   }
   setSyncStatus(result ? 'ok' : 'error');
 }
@@ -690,35 +739,42 @@ async function loadFromSheets() {
     return typeof d === 'string' && d.length === 10 && parseInt(d.slice(0,4)) >= 2020;
   }
 
-  // merge by id：本機已有的保留，Sheets 有但本機沒有的補入
-  function mergeById(localArr, remoteArr) {
+  // 同步策略：Sheets 是所有裝置的共同資料庫，以 Sheets 為唯一真相來源。
+  // 但「剛在本機 save、Sheets 還沒寫完」的資料要短暫保留，避免被舊版蓋掉。
+  // 用 _pendingIds 記錄本機正在儲存中、Sheets 還沒確認的 id。
+  function mergeRemoteFirst(localArr, remoteArr, pendingSet) {
     if (!Array.isArray(remoteArr)) return localArr;
-    const localIds = new Set(localArr.map(r => r.id));
-    const result = [...localArr];
-    remoteArr.forEach(r => { if (!localIds.has(r.id)) result.push(r); });
+    // 以 Sheets 資料為主
+    const result = [...remoteArr];
+    const remoteIds = new Set(remoteArr.map(r => r.id));
+    // 本機有、但 Sheets 還沒有，且正在儲存中的，保留（避免剛存的被洗掉）
+    localArr.forEach(r => {
+      if (!remoteIds.has(r.id) && pendingSet.has(r.id)) {
+        result.push(r);
+      }
+    });
     return result;
   }
 
-  // 下場班報名
+  // 下場班報名 — 以 Sheets 為主
   if (Array.isArray(data.regs)) {
     const remote = data.regs
       .map(r => ({ ...r, date: normalizeDate(r.date) }))
       .filter(r => validDate(r.date));
-    registrations = mergeById(registrations, remote);
+    registrations = mergeRemoteFirst(registrations, remote, _pendingIds.regs);
   }
 
-  // 短桿果嶺報名
+  // 短桿果嶺報名 — 以 Sheets 為主
   if (Array.isArray(data.shortRegs)) {
     const remote = data.shortRegs
       .map(r => ({ ...r, date: normalizeDate(r.date) }))
       .filter(r => validDate(r.date));
-    shortRegs = mergeById(shortRegs, remote);
+    shortRegs = mergeRemoteFirst(shortRegs, remote, _pendingIds.shortRegs);
   }
 
-  // 學員：merge by id
+  // 學員 — 以 Sheets 為主
   if (Array.isArray(data.students)) {
-    const localIds = new Set(students.map(s => s.id));
-    data.students.forEach(s => { if (!localIds.has(s.id)) students.push(s); });
+    students = mergeRemoteFirst(students, data.students, _pendingIds.students);
   }
 
   // 排班：Sheets 為主（行政端設定），normalizeDate 後去重，丟掉年份錯的
