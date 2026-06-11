@@ -654,14 +654,14 @@ function normalizeDate(val) {
         return y2+'-'+m2+'-'+day2;
       }
     }
-    if (val.includes('T')) {
-      var d3 = new Date(val);
-      if (!isNaN(d3.getTime())) {
-        var y3=d3.getFullYear(),m3=String(d3.getMonth()+1).padStart(2,'0'),day3=String(d3.getDate()).padStart(2,'0');
-        return y3+'-'+m3+'-'+day3;
-      }
+    // 已是 YYYY-MM-DD 開頭就直接取前10碼
+    if (/^\d{4}-\d{2}-\d{2}/.test(val)) return val.slice(0, 10);
+    // 其他格式（ISO 含T、"Mon Jun 01 2026..."等）一律交給 Date 解析
+    var d3 = new Date(val);
+    if (!isNaN(d3.getTime())) {
+      var y3=d3.getFullYear(),m3=String(d3.getMonth()+1).padStart(2,'0'),day3=String(d3.getDate()).padStart(2,'0');
+      return y3+'-'+m3+'-'+day3;
     }
-    // 已是 YYYY-MM-DD 格式
     return val.slice(0, 10);
   }
   return String(val).slice(0, 10);
@@ -923,7 +923,12 @@ function goPage(name){
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   const pg=document.getElementById('page-'+name);if(pg)pg.classList.add('active');
   const nb=document.getElementById('nb-'+name);if(nb)nb.classList.add('active');
-  if(name==='schedule')initSchedulePage();
+  if(name==='schedule'){
+    initSchedulePage();
+    if(GAS_URL&&isOnline){
+      loadFromSheets().then(ok=>{ if(ok){fillSel('sch-coach',true);renderSchedule();} });
+    }
+  }
   if(name==='register')initRegPage();
   if(name==='short')initShortPage();
   if(name==='students')renderStudents();
