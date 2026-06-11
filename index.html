@@ -572,10 +572,11 @@ function gasCall(params) {
     if (!GAS_URL) { resolve(null); return; }
     try {
       const cbName = 'gcb_' + Date.now() + '_' + Math.floor(Math.random()*10000);
-      const allParams = Object.assign({}, params, { callback: cbName });
+      // _t 防快取參數：避免 Safari ITP 快取 JSONP 回應導致拿到舊資料
+      const allParams = Object.assign({}, params, { callback: cbName, _t: Date.now() + '_' + Math.floor(Math.random()*100000) });
       const url = GAS_URL + '?' + new URLSearchParams(allParams).toString();
       const script = document.createElement('script');
-      const timer = setTimeout(() => { cleanup(); resolve(null); }, 12000);
+      const timer = setTimeout(() => { cleanup(); resolve(null); }, 20000);
       function cleanup() {
         clearTimeout(timer);
         delete window[cbName];
@@ -767,6 +768,15 @@ async function loadFromSheets() {
   sv('v3_khRate', khRate);      sv('v3_shortRate', shortRate);
 
   isOnline = true;
+  // 記錄載入統計，方便診斷
+  window._loadStats = {
+    rosters: Object.keys(rosters).length,
+    regs: registrations.length,
+    shortRegs: shortRegs.length,
+    students: students.length,
+    rawRosters: data.rosters ? Object.keys(data.rosters).length : 0,
+    rawRegs: Array.isArray(data.regs) ? data.regs.length : 0
+  };
   setSyncStatus('ok');
   return true;
 }
@@ -781,7 +791,7 @@ function setSyncStatus(status) {
     init:    { text: '未連線',    color: '#9CA3AF' },
     loading: { text: '⟳ 載入中...', color: '#F59E0B' },
     saving:  { text: '⟳ 儲存中...', color: '#F59E0B' },
-    ok:      { text: '✓ 已同步',  color: '#10B981' },
+    ok:      { text: window._loadStats ? ('✓ 同步 排'+window._loadStats.rosters+'/報'+window._loadStats.regs) : '✓ 已同步',  color: '#10B981' },
     error:   { text: '⚠ 連線失敗', color: '#EF4444' },
     offline: { text: '本機模式',  color: '#9CA3AF' },
   };
