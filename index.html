@@ -2,6 +2,9 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>國華短桿果嶺/下場班 報名管理系統</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -989,11 +992,51 @@ function _doLoginContinue(){
         const id=activePage.id.replace('page-','');
         goPage(id);
       }
+      startAutoSync(); // 啟動自動同步
     });
   }else{
     setSyncStatus('offline');
   }
 }
+
+// ===== 自動同步：每 20 秒背景拉一次 Sheets 最新資料 =====
+let _autoSyncTimer=null;
+function startAutoSync(){
+  if(_autoSyncTimer) clearInterval(_autoSyncTimer);
+  _autoSyncTimer=setInterval(function(){
+    // 分頁在背景時不同步，省流量；切回前景會立刻同步（見 visibilitychange）
+    if(document.hidden) return;
+    if(!GAS_URL||!isOnline) return;
+    loadFromSheets().then(function(ok){
+      if(!ok) return;
+      // 只重繪當前頁面，不打斷使用者正在填寫的表單
+      var activePage=document.querySelector('.page.active');
+      if(!activePage) return;
+      var id=activePage.id.replace('page-','');
+      // 只刷新「檢視型」頁面，避免洗掉正在輸入的報名表單
+      if(id==='schedule'){fillSel('sch-coach',true);renderSchedule();}
+      else if(id==='students'){renderStudents();}
+      else if(id==='roster'){renderRosterTable();renderClosedList();}
+      else if(id==='finance'){renderFinance();}
+    });
+  }, 20000); // 20 秒
+}
+
+// 切回分頁（從背景變前景）時立刻同步一次
+document.addEventListener('visibilitychange', function(){
+  if(document.hidden) return;
+  if(!GAS_URL||!isOnline) return;
+  loadFromSheets().then(function(ok){
+    if(!ok) return;
+    var activePage=document.querySelector('.page.active');
+    if(!activePage) return;
+    var id=activePage.id.replace('page-','');
+    if(id==='schedule'){fillSel('sch-coach',true);renderSchedule();}
+    else if(id==='students'){renderStudents();}
+    else if(id==='roster'){renderRosterTable();renderClosedList();}
+    else if(id==='finance'){renderFinance();}
+  });
+});
 function doLogout(){
   document.getElementById('app').style.display='none';
   document.getElementById('login-screen').style.display='flex';
