@@ -350,7 +350,7 @@ tr:hover td{background:#FAFAFA}
       <div class="card">
         <div class="card-title"><i class="ti ti-flag"></i> 短桿果嶺使用報名登記</div>
         <div style="background:#F0FDF4;border:1px solid #A7F3D0;border-radius:8px;padding:10px 14px;font-size:13px;color:#065F46;margin-bottom:1rem;display:flex;align-items:center;gap:8px">
-          <i class="ti ti-info-circle"></i>固定收費 NT$ <span id="short-rate-display">500</span> / 人，所有教練均可選，時段由教練自行填寫。<strong>報名即視為使用完畢。</strong></div>
+          <i class="ti ti-info-circle"></i>所有教練均可選，時段由教練自行填寫。<strong>報名即視為使用完畢。</strong></div>
         <div class="admin-notice" id="short-admin-notice" style="display:none"><i class="ti ti-info-circle"></i>補登過去日期的資料，請聯絡行政由後台操作</div>
         <div id="short-alert" class="alert"></div>
         <div style="margin-bottom:14px">
@@ -657,13 +657,34 @@ function gasCallFetch(params) {
 let _saveQueue = Promise.resolve();
 let _pendingSave = {}; // 去重:同一 type 只保留最新一筆
 // 記錄本機剛新增/修改、Sheets 尚未確認的 id，避免同步時被舊資料洗掉
-let _pendingIds = { regs: new Set(), shortRegs: new Set(), students: new Set() };
+// 持久化到 localStorage：即使中途登出/重整，未成功上傳的資料 id 仍能被認出而保留
+function _loadPendingIds(){
+  try{
+    const raw=JSON.parse(localStorage.getItem('v3_pendingIds')||'{}');
+    return {
+      regs:      new Set(raw.regs||[]),
+      shortRegs: new Set(raw.shortRegs||[]),
+      students:  new Set(raw.students||[]),
+    };
+  }catch(e){ return { regs:new Set(), shortRegs:new Set(), students:new Set() }; }
+}
+let _pendingIds = _loadPendingIds();
+function _savePendingIds(){
+  try{
+    localStorage.setItem('v3_pendingIds', JSON.stringify({
+      regs:      [..._pendingIds.regs],
+      shortRegs: [..._pendingIds.shortRegs],
+      students:  [..._pendingIds.students],
+    }));
+  }catch(e){}
+}
 // 標記某筆資料為「儲存中」
 function markPending(type){
   if(!_pendingIds[type]) return;
   if(type==='regs')      registrations.forEach(r=>_pendingIds.regs.add(r.id));
   if(type==='shortRegs') shortRegs.forEach(r=>_pendingIds.shortRegs.add(r.id));
   if(type==='students')  students.forEach(r=>_pendingIds.students.add(r.id));
+  _savePendingIds();
 }
 
 function saveToSheets(type) {
@@ -699,6 +720,7 @@ async function _flushSave(type) {
   // 儲存成功 → Sheets 已寫入，清除該類型的 pending 標記
   if (result && _pendingIds[type]) {
     _pendingIds[type].clear();
+    _savePendingIds();
   }
   setSyncStatus(result ? 'ok' : 'error');
 }
@@ -865,6 +887,19 @@ async function loadFromSheets() {
   sv('v3_shortHourlyRate', shortHourlyRate);
 
   isOnline = true;
+
+  // 連線恢復後：若有先前離線/失敗未上傳的資料（pending 中仍存在於本機但 Sheets 沒有），自動補傳一次
+  try{
+    const remoteRegIds   = new Set((data.regs||[]).map(r=>r.id));
+    const remoteShortIds = new Set((data.shortRegs||[]).map(r=>r.id));
+    const remoteStuIds   = new Set((data.students||[]).map(r=>r.id));
+    let need=[];
+    if([..._pendingIds.regs].some(id=>!remoteRegIds.has(id)))        need.push('regs');
+    if([..._pendingIds.shortRegs].some(id=>!remoteShortIds.has(id))) need.push('shortRegs');
+    if([..._pendingIds.students].some(id=>!remoteStuIds.has(id)))    need.push('students');
+    need.forEach(t=>saveToSheets(t)); // 補傳，成功後會自動清除 pending
+  }catch(e){}
+
   // 記錄載入統計，方便診斷
   window._loadStats = {
     rosters: Object.keys(rosters).length,
@@ -1313,7 +1348,6 @@ function renderRegTable(){
 // ===== SHORT =====
 function initShortPage(){
   fillSel('short-coach',false);
-  document.getElementById('short-rate-display').textContent=shortRate.toLocaleString();
   const dateEl=document.getElementById('short-date'),notice=document.getElementById('short-admin-notice');
   if(currentRole==='admin'){dateEl.removeAttribute('min');notice.style.display='none';dateEl.value=todayISO();}
   else{dateEl.min=todayISO();dateEl.value=todayISO();notice.style.display='flex';}
