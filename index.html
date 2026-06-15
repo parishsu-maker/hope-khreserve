@@ -414,7 +414,7 @@ tr:hover td{background:#FAFAFA}
             </div>
             <div class="fg time-other-wrap" id="short-hours-wrap">
               <label>時數（小時）</label>
-              <input type="number" id="short-hours" value="1" min="0.5" step="0.5" onchange="calcShortFee()" oninput="calcShortFee()">
+              <input type="number" id="short-hours" value="1" min="1" step="1" onchange="calcShortFee()" oninput="calcShortFee()">
             </div>
           </div>
           <div class="form-row" style="margin-bottom:0">
@@ -1353,7 +1353,7 @@ function calcShortFee(){
   const mode=(document.getElementById('short-price-mode')||{}).value||'fixed';
   let fee;
   if(mode==='hourly'){
-    const hours=parseFloat((document.getElementById('short-hours')||{}).value||1)||1;
+    const hours=Math.max(1,Math.round(parseFloat((document.getElementById('short-hours')||{}).value||1)||1));
     fee=shortHourlyRate*hours*count;
   }else{
     fee=shortRate*count;
@@ -1398,7 +1398,7 @@ function submitShort(){
   if(shortIsNewStudent){const sess=parseInt(document.getElementById('short-new-stu-sessions').value)||1;const ns={id:Date.now(),name:stuName,plan:'單堂',totalSessions:sess,source:'auto'};students.push(ns);sv('v3_students',students);saveToSheets('students');stuId=ns.id}
   const stu=students.find(s=>s.id===stuId),now=Date.now();
   const priceMode=(document.getElementById('short-price-mode')||{}).value||'fixed';
-  const hours=priceMode==='hourly'?(parseFloat((document.getElementById('short-hours')||{}).value||1)||1):0;
+  const hours=priceMode==='hourly'?Math.max(1,Math.round(parseFloat((document.getElementById('short-hours')||{}).value||1)||1)):0;
   const shortAmount=priceMode==='hourly'?Math.round(shortHourlyRate*hours*count):shortRate*count;
   shortRegs.push({id:now,createdAt:now,date,time,coach,studentId:stuId,studentName:stu.name,count,note,priceMode,hours,amount:shortAmount});
   sv('v3_shortRegs',shortRegs);saveToSheets('shortRegs');
