@@ -395,6 +395,18 @@ tr:hover td{background:#FAFAFA}
         <div class="divider"></div>
         <div style="margin-bottom:14px">
           <div style="font-size:12px;color:#888;margin-bottom:6px"><span class="step-badge">3</span>費用</div>
+          <div class="form-row" style="margin-bottom:8px">
+            <div class="fg"><label>計價方式</label>
+              <select id="short-price-mode" onchange="onShortPriceModeChange()">
+                <option value="fixed">每人固定</option>
+                <option value="hourly">每小時計價</option>
+              </select>
+            </div>
+            <div class="fg time-other-wrap" id="short-hours-wrap">
+              <label>時數（小時）</label>
+              <input type="number" id="short-hours" value="1" min="0.5" step="0.5" onchange="calcShortFee()" oninput="calcShortFee()">
+            </div>
+          </div>
           <div class="form-row" style="margin-bottom:0">
             <div class="fg"><label>應收費用（報名即鎖定）</label><input type="text" id="short-fee-display" readonly style="background:#F7F7F7;font-weight:600"></div>
             <div class="fg"><label>備註</label><input type="text" id="short-note" placeholder="選填"></div>
@@ -518,7 +530,7 @@ tr:hover td{background:#FAFAFA}
     <div id="page-settings" class="page">
       <div class="card"><div class="card-title">教練名單</div><div id="coach-list-ui"></div><hr class="divider"><div class="ilfx"><input type="text" id="new-coach" placeholder="新增教練姓名" style="width:180px;padding:8px 10px;border:1px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:'Noto Sans TC',sans-serif"><button class="btn btn-primary btn-sm" onclick="addCoach()">新增</button></div></div>
       <div class="card"><div class="card-title">系統已購課訂單設定（下場班）</div><p style="font-size:12px;color:#888;margin-bottom:1rem"><i class="ti ti-lock"></i> 修改後僅影響新報名，舊記錄金額不變</p><div id="fee-types-ui"></div><hr class="divider"><div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap"><div class="fg" style="flex:2;min-width:160px"><label>訂單名稱</label><input type="text" id="new-fee-name" placeholder="例：個人套組第三堂"></div><div class="fg" style="flex:1;min-width:100px"><label>金額 (NT$)</label><input type="number" id="new-fee-amt" placeholder="例：3000" min="0"></div><button class="btn btn-primary btn-sm" onclick="addFeeType()" style="align-self:flex-end;height:36px">新增</button></div></div>
-      <div class="card"><div class="card-title">費率設定</div><p style="font-size:12px;color:#888;margin-bottom:1rem"><i class="ti ti-lock"></i> 修改後僅影響新報名，舊記錄金額不變</p><div class="si"><span style="font-size:13px">國華球場費用（每人）</span><div class="ilfx"><span style="font-size:12px;color:#888">NT$/人</span><input type="number" id="kh-rate" style="width:90px;text-align:right;padding:6px 8px;border:1px solid #E0E0E0;border-radius:6px;font-family:'Noto Sans TC',sans-serif" onchange="saveKhRate(this.value)"></div></div><div class="si"><span style="font-size:13px">短桿果嶺費用（每人）</span><div class="ilfx"><span style="font-size:12px;color:#888">NT$/人</span><input type="number" id="short-rate" style="width:90px;text-align:right;padding:6px 8px;border:1px solid #E0E0E0;border-radius:6px;font-family:'Noto Sans TC',sans-serif" onchange="saveShortRate(this.value)"></div></div></div>
+      <div class="card"><div class="card-title">費率設定</div><p style="font-size:12px;color:#888;margin-bottom:1rem"><i class="ti ti-lock"></i> 修改後僅影響新報名，舊記錄金額不變</p><div class="si"><span style="font-size:13px">國華球場費用（每人）</span><div class="ilfx"><span style="font-size:12px;color:#888">NT$/人</span><input type="number" id="kh-rate" style="width:90px;text-align:right;padding:6px 8px;border:1px solid #E0E0E0;border-radius:6px;font-family:'Noto Sans TC',sans-serif" onchange="saveKhRate(this.value)"></div></div><div class="si"><span style="font-size:13px">短桿果嶺費用（每人固定）</span><div class="ilfx"><span style="font-size:12px;color:#888">NT$/人</span><input type="number" id="short-rate" style="width:90px;text-align:right;padding:6px 8px;border:1px solid #E0E0E0;border-radius:6px;font-family:'Noto Sans TC',sans-serif" onchange="saveShortRate(this.value)"></div></div><div class="si"><span style="font-size:13px">短桿果嶺費用（每小時）</span><div class="ilfx"><span style="font-size:12px;color:#888">NT$/小時/人</span><input type="number" id="short-hourly-rate" style="width:90px;text-align:right;padding:6px 8px;border:1px solid #E0E0E0;border-radius:6px;font-family:'Noto Sans TC',sans-serif" onchange="saveShortHourlyRate(this.value)"></div></div></div>
       <div class="card"><div class="card-title">教練抽成費率（下場班）</div><p style="font-size:13px;color:#888;margin-bottom:4px">每帶一位學員的教練費，最低保障＝2倍</p><p style="font-size:12px;color:#888;margin-bottom:1rem"><i class="ti ti-lock"></i> 修改後僅影響新報名，舊記錄金額不變</p><div id="coach-fee-ui"></div></div>
     </div>
 
@@ -664,7 +676,7 @@ async function _flushSave(type) {
   if (type === 'closed')    payload = { action: 'saveClosed',    data: JSON.stringify(closedDates) };
   if (type === 'settings')  payload = { action: 'saveSettings',  data: JSON.stringify({
     coaches: JSON.stringify(coaches), feeTypes: JSON.stringify(feeTypes),
-    coachFees: JSON.stringify(coachFees), khRate, shortRate
+    coachFees: JSON.stringify(coachFees), khRate, shortRate, shortHourlyRate
   })};
   if (!payload) return;
   // 最多重試 2 次
@@ -832,6 +844,7 @@ async function loadFromSheets() {
     if (s.coachFees) { try { const p=JSON.parse(s.coachFees); if(p&&typeof p==='object') coachFees = p; } catch(e) {} }
     if (s.khRate)    { const n=Number(s.khRate);    if(!isNaN(n)&&n>0) khRate    = n; }
     if (s.shortRate) { const n=Number(s.shortRate); if(!isNaN(n)&&n>0) shortRate = n; }
+    if (s.shortHourlyRate) { const n=Number(s.shortHourlyRate); if(!isNaN(n)&&n>0) shortHourlyRate = n; }
   }
 
   sv('v3_regs', registrations); sv('v3_shortRegs', shortRegs);
@@ -839,6 +852,7 @@ async function loadFromSheets() {
   sv('v3_closed', closedDates); sv('v3_coaches', coaches);
   sv('v3_feeTypes', feeTypes);  sv('v3_coachFees', coachFees);
   sv('v3_khRate', khRate);      sv('v3_shortRate', shortRate);
+  sv('v3_shortHourlyRate', shortHourlyRate);
 
   isOnline = true;
   // 記錄載入統計，方便診斷
@@ -895,7 +909,7 @@ function refreshCurrentPage() {
 // ===== DATA =====
 const DEF_COACHES=['Carol','Adam','Kenny','Joanne','Vis','Kevin','Allen','Sean','Ava','Howard','Ella','Elly','Gary','Foin','William'];
 const DEF_FEES=[{name:'單堂',amount:3000},{name:'個人套組 第一堂',amount:2800},{name:'個人套組 第二堂',amount:2800},{name:'2人套組',amount:2500},{name:'3人套組',amount:2200},{name:'週週下場班（4堂）',amount:10000}];
-const DEF_COACH_FEE=1000,DEF_KH=1100,DEF_SHORT=500;
+const DEF_COACH_FEE=1000,DEF_KH=1100,DEF_SHORT=500,DEF_SHORT_HOURLY=600;
 const DOWS=['日','一','二','三','四','五','六'];
 
 function ld(k,d){
@@ -912,7 +926,7 @@ function ld(k,d){
 function sv(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 
 let coaches=Array.isArray(ld('v3_coaches',DEF_COACHES))?ld('v3_coaches',DEF_COACHES):DEF_COACHES,feeTypes=ld('v3_feeTypes',DEF_FEES),coachFees=ld('v3_coachFees',{});
-let khRate=ld('v3_khRate',DEF_KH),shortRate=ld('v3_shortRate',DEF_SHORT);
+let khRate=ld('v3_khRate',DEF_KH),shortRate=ld('v3_shortRate',DEF_SHORT),shortHourlyRate=ld('v3_shortHourlyRate',DEF_SHORT_HOURLY);
 let registrations=ld('v3_regs',[]),students=ld('v3_students',[]);
 let shortRegs=ld('v3_shortRegs',[]);
 let rosters=ld('v3_rosters',{}),closedDates=ld('v3_closed',{});
@@ -1261,6 +1275,10 @@ function initShortPage(){
   document.getElementById('short-time-select').value='';
   document.getElementById('short-time-other').value='';
   document.getElementById('short-time-other-wrap').classList.remove('show');
+  // 重置計價方式為每人固定
+  document.getElementById('short-price-mode').value='fixed';
+  document.getElementById('short-hours').value='1';
+  document.getElementById('short-hours-wrap').classList.remove('show');
   calcShortFee();renderShortTable();resetShortFields();
 }
 
@@ -1284,7 +1302,25 @@ function getShortTime(){
   return sel;
 }
 
-function calcShortFee(){const count=parseInt((document.getElementById('short-count')||{}).value||1);document.getElementById('short-fee-display').value='NT$ '+(shortRate*count).toLocaleString()}
+function calcShortFee(){
+  const count=parseInt((document.getElementById('short-count')||{}).value||1);
+  const mode=(document.getElementById('short-price-mode')||{}).value||'fixed';
+  let fee;
+  if(mode==='hourly'){
+    const hours=parseFloat((document.getElementById('short-hours')||{}).value||1)||1;
+    fee=shortHourlyRate*hours*count;
+  }else{
+    fee=shortRate*count;
+  }
+  document.getElementById('short-fee-display').value='NT$ '+Math.round(fee).toLocaleString();
+}
+function onShortPriceModeChange(){
+  const mode=(document.getElementById('short-price-mode')||{}).value||'fixed';
+  const wrap=document.getElementById('short-hours-wrap');
+  if(mode==='hourly'){wrap.classList.add('show');}
+  else{wrap.classList.remove('show');}
+  calcShortFee();
+}
 function onShortStuNameInput(){
   const name=document.getElementById('short-stu-name').value.trim();
   shortSelectedStudentId=null;shortIsNewStudent=false;
@@ -1315,7 +1351,10 @@ function submitShort(){
   let stuId=shortSelectedStudentId;
   if(shortIsNewStudent){const sess=parseInt(document.getElementById('short-new-stu-sessions').value)||1;const ns={id:Date.now(),name:stuName,plan:'單堂',totalSessions:sess,source:'auto'};students.push(ns);sv('v3_students',students);saveToSheets('students');stuId=ns.id}
   const stu=students.find(s=>s.id===stuId),now=Date.now();
-  shortRegs.push({id:now,createdAt:now,date,time,coach,studentId:stuId,studentName:stu.name,count,note,amount:shortRate*count});
+  const priceMode=(document.getElementById('short-price-mode')||{}).value||'fixed';
+  const hours=priceMode==='hourly'?(parseFloat((document.getElementById('short-hours')||{}).value||1)||1):0;
+  const shortAmount=priceMode==='hourly'?Math.round(shortHourlyRate*hours*count):shortRate*count;
+  shortRegs.push({id:now,createdAt:now,date,time,coach,studentId:stuId,studentName:stu.name,count,note,priceMode,hours,amount:shortAmount});
   sv('v3_shortRegs',shortRegs);saveToSheets('shortRegs');
   al.className='alert alert-success';al.textContent='✓ 短桿果嶺報名成功：'+stu.name+' ／ '+date+' ／ 教練：'+coach;
   resetShortFields();document.getElementById('short-note').value='';renderShortTable();renderSchedule();renderStudents();
@@ -1329,6 +1368,9 @@ function clearShort(){
   document.getElementById('short-time-select').value='';
   document.getElementById('short-time-other').value='';
   document.getElementById('short-time-other-wrap').classList.remove('show');
+  document.getElementById('short-price-mode').value='fixed';
+  document.getElementById('short-hours').value='1';
+  document.getElementById('short-hours-wrap').classList.remove('show');
   calcShortFee();
 }
 
@@ -1340,7 +1382,7 @@ function renderShortTable(){
     <td><span style="font-weight:600">${r.date}</span><span class="time-sub">登記 ${fmtTime(r.createdAt||r.id)}</span></td>
     <td>${r.time}</td><td><span class="avatar">${r.coach.slice(0,2)}</span>${r.coach}</td>
     <td style="font-weight:500">${r.studentName}</td><td>${r.count}</td>
-    <td style="font-weight:600">NT$ ${r.amount.toLocaleString()}</td>
+    <td style="font-weight:600">NT$ ${r.amount.toLocaleString()}${r.priceMode==='hourly'?'<span class="time-sub">'+r.hours+'小時/人</span>':''}</td>
     <td style="color:#9CA3AF">${r.note||'—'}</td>
     <td><button class="btn btn-danger btn-sm" onclick="deleteShort(${r.id})">刪除</button></td></tr>`).join('');
 }
@@ -1424,7 +1466,7 @@ function downloadExcel(mode){
     return{'下場日期':r.date,'登記時間':fmtTime(r.createdAt||r.id),'學員姓名':r.studentName,'登記教練':r.selfCoach||'','指定教練':r.coach,'人數（教練上課時數）':r.count,'系統已購課訂單':r.feeType,'課堂數':sessions,'開班狀態':open?'開班':'未開班','是否改期':hasLog?'是':'否','改期原因':lastLog?lastLog.reason:'','備註':r.note||''}});
   const byCoach={};regs.forEach(r=>{const open=isClassOpen(r.date,r.coach);const sessions=r.sessions||r.count;if(!byCoach[r.coach])byCoach[r.coach]={openDays:new Set(),students:0,sessions:0,coachHours:0,fee:0};if(open){byCoach[r.coach].openDays.add(r.date);byCoach[r.coach].students+=r.count;byCoach[r.coach].sessions+=sessions;byCoach[r.coach].coachHours+=r.count;byCoach[r.coach].fee+=(r.coachFee||0)}});
   const coachRows=Object.entries(byCoach).map(([c,d])=>({'教練':c,'開班堂數':d.openDays.size,'學員總人次':d.students,'課堂數':d.sessions,'教練上課時數':d.coachHours,'教練費合計':Math.round(d.fee)}));
-  const shortRows=sRegs.map(r=>({'日期':r.date,'登記時間':fmtTime(r.createdAt||r.id),'時段':r.time,'教練':r.coach,'學員姓名':r.studentName,'人數':r.count,'收款':r.amount,'備註':r.note||''}));
+  const shortRows=sRegs.map(r=>({'日期':r.date,'登記時間':fmtTime(r.createdAt||r.id),'時段':r.time,'教練':r.coach,'學員姓名':r.studentName,'人數':r.count,'計價方式':r.priceMode==='hourly'?'每小時':'每人固定','時數':r.priceMode==='hourly'?r.hours:'','收款':r.amount,'備註':r.note||''}));
   const summaryRows=[{'項目':'區間','數值':start+' 至 '+end},{'項目':'下場班總人次（開班）','數值':openRegs.reduce((s,r)=>s+r.count,0)},{'項目':'已開班課堂數','數值':openRegs.reduce((s,r)=>s+(r.sessions||r.count),0)},{'項目':'已開班教練上課時數','數值':openRegs.reduce((s,r)=>s+r.count,0)},{'項目':'應付國華費用（NT$）','數值':openRegs.reduce((s,r)=>s+(r.khFee||0),0)},{'項目':'教練費合計（僅開班）','數值':Math.round(openRegs.reduce((s,r)=>s+(r.coachFee||0),0))},{'項目':'短桿果嶺總收款','數值':sRegs.reduce((s,r)=>s+r.amount,0)},{'項目':'短桿果嶺人次','數值':sRegs.reduce((s,r)=>s+r.count,0)}];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(detailRows.length?detailRows:[{提示:'此區間無資料'}]),'下場班明細');
@@ -1464,7 +1506,7 @@ function renderFinance(){
 // ===== SETTINGS =====
 function renderSettings(){
   ensureArrays();
-  document.getElementById('kh-rate').value=khRate;document.getElementById('short-rate').value=shortRate;
+  document.getElementById('kh-rate').value=khRate;document.getElementById('short-rate').value=shortRate;document.getElementById('short-hourly-rate').value=shortHourlyRate;
   document.getElementById('coach-list-ui').innerHTML=coaches.map((c,i)=>`<div class="si"><div class="ilfx"><span class="avatar">${c.slice(0,2)}</span><span>${c}</span></div><button class="btn btn-danger btn-sm" onclick="removeCoach(${i})">移除</button></div>`).join('');
   document.getElementById('fee-types-ui').innerHTML=feeTypes.length
     ? feeTypes.map((ft,i)=>`<div class="si"><span>${ft.name}</span><div class="ilfx"><input type="number" value="${ft.amount}" onchange="updateFeeAmt(${i},this.value)" style="width:90px;text-align:right;padding:5px 8px;border:1px solid #E0E0E0;border-radius:6px;font-family:'Noto Sans TC',sans-serif"><button class="btn btn-danger btn-sm" onclick="removeFeeType(${i})">刪除</button></div></div>`).join('')
@@ -1502,7 +1544,8 @@ function removeFeeType(i){feeTypes.splice(i,1);sv('v3_feeTypes',feeTypes);saveTo
 function updateFeeAmt(i,v){feeTypes[i].amount=parseInt(v)||0;sv('v3_feeTypes',feeTypes)}
 function updateCoachFee(c,v){coachFees[c]=parseInt(v)||0;sv('v3_coachFees',coachFees)}
 function saveKhRate(v){khRate=parseInt(v)||DEF_KH;sv('v3_khRate',khRate)}
-function saveShortRate(v){shortRate=parseInt(v)||DEF_SHORT;sv('v3_shortRate',shortRate)}
+function saveShortRate(v){shortRate=parseInt(v)||DEF_SHORT;sv('v3_shortRate',shortRate);saveToSheets('settings')}
+function saveShortHourlyRate(v){shortHourlyRate=parseInt(v)||DEF_SHORT_HOURLY;sv('v3_shortHourlyRate',shortHourlyRate);saveToSheets('settings')}
 
 // ===== INIT =====
 currentWeekStart=getWeekStart(new Date());
