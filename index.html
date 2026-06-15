@@ -293,6 +293,19 @@ tr:hover td{background:#FAFAFA}
             <div class="fg"><label>人數 <span style="font-weight:400;color:#9CA3AF;font-size:11px">(一對一請選2人)</span></label>
               <select id="reg-count" onchange="syncCoachHours()"><option value="1">1人</option><option value="2">2人</option><option value="3">3人</option><option value="4">4人</option></select></div>
           </div>
+          <div style="margin-bottom:6px">
+            <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;padding:8px 12px;border:1px solid #E0E0E0;border-radius:8px;background:#fff;transition:all .12s" id="solo-class-label" onclick="onSoloClassChange()">
+              <span style="width:18px;height:18px;border-radius:4px;border:1.5px solid #D1D5DB;background:#fff;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .12s" id="solo-class-box">
+                <i class="ti ti-check" style="font-size:12px;color:#fff;display:none" id="solo-class-check"></i>
+              </span>
+              <input type="checkbox" id="reg-solo-class" style="display:none" onchange="onSoloClassChange()">
+              <span style="font-size:13px;font-weight:500">一人開班</span>
+              <span style="font-size:11px;color:#9CA3AF">（勾選後此教練此日不開放其他學員報名）</span>
+            </label>
+            <div id="solo-class-banner" style="display:none;margin-top:6px;padding:7px 12px;background:#FFF7ED;border:1px solid #FDBA74;border-radius:8px;font-size:12px;color:#C2410C;display:none;align-items:center;gap:6px">
+              <i class="ti ti-lock"></i> 一人開班模式：此教練此日僅限此學員上課，其他人無法報名
+            </div>
+          </div>
           <div class="similar-box" id="similar-box">
             <div style="font-size:12px;font-weight:500;margin-bottom:6px;color:#666">找到相似學員，確認是否同一人：</div>
             <div id="similar-list"></div>
@@ -1127,6 +1140,29 @@ function ensureArrays(){
   if(!coachFees||typeof coachFees!=='object'||Array.isArray(coachFees)) coachFees = {};
 }
 function syncCoachHours(){const c=parseInt((document.getElementById('reg-count')||{}).value||1);document.getElementById('preview-coach-hours').value=c+' 人次'}
+function onSoloClassChange(){
+  const cb=document.getElementById('reg-solo-class');
+  cb.checked=!cb.checked;
+  const box=document.getElementById('solo-class-box');
+  const chk=document.getElementById('solo-class-check');
+  const lbl=document.getElementById('solo-class-label');
+  const banner=document.getElementById('solo-class-banner');
+  if(cb.checked){
+    box.style.background='#6B9E8F';box.style.borderColor='#6B9E8F';
+    chk.style.display='';
+    lbl.style.borderColor='#6B9E8F';lbl.style.background='#EAF2EF';
+    banner.style.display='flex';
+  }else{
+    box.style.background='#fff';box.style.borderColor='#D1D5DB';
+    chk.style.display='none';
+    lbl.style.borderColor='#E0E0E0';lbl.style.background='#fff';
+    banner.style.display='none';
+  }
+}
+function isSoloClass(date,coach){
+  // 檢查某教練某日是否已被標記為一人開班
+  return registrations.some(r=>r.date===date&&r.coach===coach&&r.soloClass===true);
+}
 
 // ===== SCHEDULE =====
 function shiftWeek(n){currentWeekStart=addDays(currentWeekStart,n*7);renderSchedule()}
@@ -1159,6 +1195,7 @@ function renderSchedule(){
         const names=rs.map(r=>r.studentName+(r.count>1?'×'+r.count:'')).join('、');
         let tag='';
         if(total>=4)tag='<span class="tag tag-red">額滿</span>';
+        else if(isSoloClass(date,coach))tag='<span class="tag tag-reschedule"><i class="ti ti-lock"></i> 一人開班</span>';
         else if(total>=2)tag='<span class="tag tag-green">開班</span>';
         else if(total===1&&past)tag='<span class="tag tag-reschedule"><i class="ti ti-alert-triangle"></i> 待改期</span>';
         else tag='<span class="tag tag-amber">待確認</span>';
@@ -1193,13 +1230,16 @@ function onRegDateChange(){
   if(isClosed(date)){al.className='alert alert-danger';al.textContent='⛔ '+date+' 為封場日，無法報名';sel.innerHTML='<option value="">此日封場</option>';return}
   al.className='alert';al.textContent='';
   const dc=rosters[date]||[];if(!dc.length){sel.innerHTML='<option value="">此日無排班教練</option>';return}
-  dc.forEach(c=>{const taken=registrations.filter(r=>r.date===date&&r.coach===c).reduce((s,r)=>s+r.count,0);const o=document.createElement('option');o.value=c;o.textContent=c+(taken>=4?' 【額滿】':' ('+taken+'/4)');if(taken>=4)o.disabled=true;sel.appendChild(o)});
+  dc.forEach(c=>{const taken=registrations.filter(r=>r.date===date&&r.coach===c).reduce((s,r)=>s+r.count,0);const solo=isSoloClass(date,c);const o=document.createElement('option');o.value=c;o.textContent=c+(taken>=4?' 【額滿】':solo?' 【一人開班】':' ('+taken+'/4)');if(taken>=4||solo)o.disabled=true;sel.appendChild(o)});
 }
 function checkCoachSlots(){
   const date=document.getElementById('reg-date').value,coach=document.getElementById('reg-coach').value;if(!date||!coach)return;
   const taken=registrations.filter(r=>r.date===date&&r.coach===coach).reduce((s,r)=>s+r.count,0);
+  const solo=isSoloClass(date,coach);
   const al=document.getElementById('reg-alert');
-  if(taken>=4){al.className='alert alert-warn';al.textContent='⚠️ '+coach+' 在 '+date+' 已額滿'}else{al.className='alert';al.textContent=''}
+  if(solo){al.className='alert alert-warn';al.textContent='⛔ '+coach+' 在 '+date+' 已設定一人開班，不開放其他學員報名'}
+  else if(taken>=4){al.className='alert alert-warn';al.textContent='⚠️ '+coach+' 在 '+date+' 已額滿'}
+  else{al.className='alert';al.textContent=''}
 }
 function onStuNameInput(){
   const name=document.getElementById('reg-stu-name').value.trim();
@@ -1231,6 +1271,10 @@ function submitReg(){
   if(isNewStudent){const sess=parseInt(document.getElementById('new-stu-sessions').value)||1;const ns={id:Date.now(),name:stuName,plan:'單堂',totalSessions:sess,source:'auto'};students.push(ns);sv('v3_students',students);saveToSheets('students');stuId=ns.id}
   const taken=registrations.filter(r=>r.date===date&&r.coach===coach).reduce((s,r)=>s+r.count,0);
   if(taken+count>4){al.className='alert alert-warn';al.textContent='⚠️ 加入後超過4人上限';return}
+  if(isSoloClass(date,coach)){al.className='alert alert-danger';al.textContent='⛔ '+coach+' 在 '+date+' 已設定一人開班，無法再加入其他學員';return}
+  // 如果此次勾選一人開班，但該教練此日已有其他學員報名，也要擋
+  const soloClass=document.getElementById('reg-solo-class').checked;
+  if(soloClass&&taken>0){al.className='alert alert-warn';al.textContent='⚠️ 該教練此日已有其他學員報名，無法設定一人開班';return}
   const stu=students.find(s=>s.id===stuId);
   const remain=getRemain(stu);
   // 堂數不足時自動補入，不擋報名（學員購買新堂次）
@@ -1240,12 +1284,23 @@ function submitReg(){
     saveToSheets('students');
   }
   const ft=feeTypes.find(f=>f.name===feeType),now=Date.now();
-  registrations.push({id:now,createdAt:now,date,selfCoach,coach,studentId:stuId,studentName:stu.name,count,sessions,level,feeType,note,amount:ft?ft.amount:0,khFee:count*khRate,coachFee:calcLockedCoachFee(coach,count)});
+  registrations.push({id:now,createdAt:now,date,selfCoach,coach,studentId:stuId,studentName:stu.name,count,sessions,level,feeType,note,soloClass,amount:ft?ft.amount:0,khFee:count*khRate,coachFee:calcLockedCoachFee(coach,count)});
   sv('v3_regs',registrations);saveToSheets('regs');
-  al.className='alert alert-success';al.textContent='✓ 報名成功：'+stu.name+(isNewStudent?' （已自動建檔）':'')+' ／ '+date+' ／ 教練：'+coach;
-  resetStudentFields();document.getElementById('reg-sessions').value=1;syncCoachHours();renderRegTable();setTimeout(()=>{al.className='alert'},5000);
+  al.className='alert alert-success';al.textContent='✓ 報名成功：'+stu.name+(isNewStudent?' （已自動建檔）':'')+' ／ '+date+' ／ 教練：'+coach+(soloClass?' ／ 一人開班':'');
+  resetStudentFields();document.getElementById('reg-sessions').value=1;syncCoachHours();
+  // 重置一人開班
+  const soloCb=document.getElementById('reg-solo-class');if(soloCb.checked){soloCb.checked=false;onSoloClassChange();}
+  renderRegTable();setTimeout(()=>{al.className='alert'},5000);
 }
-function clearReg(){resetStudentFields();document.getElementById('reg-note').value='';document.getElementById('reg-sessions').value=1;syncCoachHours()}
+function clearReg(){
+  resetStudentFields();
+  document.getElementById('reg-note').value='';
+  document.getElementById('reg-sessions').value=1;
+  syncCoachHours();
+  // 重置一人開班
+  const cb=document.getElementById('reg-solo-class');
+  if(cb.checked){cb.checked=false;onSoloClassChange();}
+}
 function deleteReg(id){if(!confirm('確定刪除此筆報名？'))return;registrations=registrations.filter(r=>r.id!==id);sv('v3_regs',registrations);saveToSheets('regs');renderRegTable();renderSchedule();renderStudents()}
 function renderRegTable(){
   const tbody=document.getElementById('reg-tbody');if(!tbody)return;
@@ -1253,10 +1308,11 @@ function renderRegTable(){
   tbody.innerHTML=[...registrations].sort((a,b)=>a.id-b.id).map(r=>{
     const hasLog=r.rescheduleLog&&r.rescheduleLog.length>0,lastLog=hasLog?r.rescheduleLog[r.rescheduleLog.length-1]:null;
     const noteCell=hasLog?`<span class="tag tag-amber" style="font-size:10px;margin-right:4px">改期</span><span style="font-size:12px;color:#9CA3AF">原 ${lastLog.from}${lastLog.reason&&lastLog.reason!=='未填寫'?' — '+lastLog.reason:''}</span>`:`<span style="font-size:12px;color:#9CA3AF">${r.note||'—'}</span>`;
+    const soloTag=r.soloClass?'<span class="tag tag-reschedule" style="font-size:10px;margin-left:4px"><i class="ti ti-lock"></i> 一人開班</span>':'';
     const sessions=r.sessions||r.count;
     return `<tr><td><span style="font-weight:600">${r.date}</span><span class="time-sub">登記 ${fmtTime(r.createdAt||r.id)}</span></td>
       <td><span class="avatar">${(r.selfCoach||'?').slice(0,2)}</span>${r.selfCoach||'—'}</td>
-      <td style="font-weight:500">${r.studentName}</td><td>${r.count}</td>
+      <td style="font-weight:500">${r.studentName}</td><td>${r.count}${soloTag}</td>
       <td><span class="avatar">${r.coach.slice(0,2)}</span>${r.coach}</td>
       <td>${r.feeType}</td><td>${sessions} 堂</td><td>${r.count} 人次</td>
       <td>${noteCell}</td>
@@ -1463,7 +1519,7 @@ function downloadExcel(mode){
   const sRegs=shortRegs.filter(r=>r.date>=start&&r.date<=end).sort((a,b)=>a.id-b.id);
   const openRegs=regs.filter(r=>isClassOpen(r.date,r.coach));
   const detailRows=regs.map(r=>{const open=isClassOpen(r.date,r.coach);const hasLog=r.rescheduleLog&&r.rescheduleLog.length>0;const lastLog=hasLog?r.rescheduleLog[r.rescheduleLog.length-1]:null;const sessions=r.sessions||r.count;
-    return{'下場日期':r.date,'登記時間':fmtTime(r.createdAt||r.id),'學員姓名':r.studentName,'登記教練':r.selfCoach||'','指定教練':r.coach,'人數（教練上課時數）':r.count,'系統已購課訂單':r.feeType,'課堂數':sessions,'開班狀態':open?'開班':'未開班','是否改期':hasLog?'是':'否','改期原因':lastLog?lastLog.reason:'','備註':r.note||''}});
+    return{'下場日期':r.date,'登記時間':fmtTime(r.createdAt||r.id),'學員姓名':r.studentName,'登記教練':r.selfCoach||'','指定教練':r.coach,'人數（教練上課時數）':r.count,'系統已購課訂單':r.feeType,'課堂數':sessions,'開班狀態':open?'開班':'未開班','一人開班':r.soloClass?'是':'否','是否改期':hasLog?'是':'否','改期原因':lastLog?lastLog.reason:'','備註':r.note||''}});
   const byCoach={};regs.forEach(r=>{const open=isClassOpen(r.date,r.coach);const sessions=r.sessions||r.count;if(!byCoach[r.coach])byCoach[r.coach]={openDays:new Set(),students:0,sessions:0,coachHours:0,fee:0};if(open){byCoach[r.coach].openDays.add(r.date);byCoach[r.coach].students+=r.count;byCoach[r.coach].sessions+=sessions;byCoach[r.coach].coachHours+=r.count;byCoach[r.coach].fee+=(r.coachFee||0)}});
   const coachRows=Object.entries(byCoach).map(([c,d])=>({'教練':c,'開班堂數':d.openDays.size,'學員總人次':d.students,'課堂數':d.sessions,'教練上課時數':d.coachHours,'教練費合計':Math.round(d.fee)}));
   const shortRows=sRegs.map(r=>({'日期':r.date,'登記時間':fmtTime(r.createdAt||r.id),'時段':r.time,'教練':r.coach,'學員姓名':r.studentName,'人數':r.count,'計價方式':r.priceMode==='hourly'?'每小時':'每人固定','時數':r.priceMode==='hourly'?r.hours:'','收款':r.amount,'備註':r.note||''}));
@@ -1497,8 +1553,8 @@ function renderFinance(){
   const entries=Object.entries(byCoach).filter(([,d])=>d.openDays.size>0);
   ct.innerHTML=entries.length?entries.map(([c,d])=>`<tr><td><span class="avatar">${c.slice(0,2)}</span><strong>${c}</strong></td><td>${d.openDays.size}</td><td>${d.students}</td><td>${d.sessions} 堂</td><td>${d.coachHours} 人次</td><td style="font-weight:600">NT$ ${Math.round(d.fee).toLocaleString()}</td></tr>`).join(''):'<tr><td colspan="6" style="text-align:center;color:#9CA3AF;padding:1.5rem">此期間無開班記錄</td></tr>';
   const dt=document.getElementById('fin-daily-tbody');
-  dt.innerHTML=regs.length?[...regs].sort((a,b)=>a.id-b.id).map(r=>{const open=isClassOpen(r.date,r.coach);const sessions=r.sessions||r.count;const openTag=open?'<span class="tag tag-green" style="font-size:10px">開班</span>':'<span class="tag tag-reschedule" style="font-size:10px">未開班</span>';
-    return `<tr${open?'':' style="opacity:.6"'}><td>${r.date}</td><td>${r.studentName}</td><td>${r.coach}</td><td>${r.feeType}</td><td>${r.count}</td><td>${open?sessions+' 堂':'—'}</td><td>${open?r.count+' 人次':'—'}</td><td>${openTag}</td></tr>`}).join(''):'<tr><td colspan="8" style="text-align:center;color:#9CA3AF;padding:1.5rem">此期間無資料</td></tr>';
+  dt.innerHTML=regs.length?[...regs].sort((a,b)=>a.id-b.id).map(r=>{const open=isClassOpen(r.date,r.coach);const sessions=r.sessions||r.count;const openTag=open?'<span class="tag tag-green" style="font-size:10px">開班</span>':'<span class="tag tag-reschedule" style="font-size:10px">未開班</span>';const soloTag=r.soloClass?'<span class="tag tag-amber" style="font-size:10px;margin-left:4px"><i class="ti ti-lock"></i> 一人開班</span>':'';
+    return `<tr${r.soloClass?' style="background:#FFFBEB"':open?'':' style="opacity:.6"'}><td>${r.date}</td><td>${r.studentName}</td><td>${r.coach}</td><td>${r.feeType}</td><td>${r.count}${soloTag}</td><td>${open?sessions+' 堂':'—'}</td><td>${open?r.count+' 人次':'—'}</td><td>${openTag}</td></tr>`}).join(''):'<tr><td colspan="8" style="text-align:center;color:#9CA3AF;padding:1.5rem">此期間無資料</td></tr>';
   const st=document.getElementById('fin-short-tbody');
   st.innerHTML=sRegs.length?[...sRegs].sort((a,b)=>a.id-b.id).map(r=>`<tr><td>${r.date}</td><td>${r.time}</td><td>${r.coach}</td><td>${r.studentName}</td><td>${r.count}</td><td style="font-weight:600">NT$ ${r.amount.toLocaleString()}</td></tr>`).join(''):'<tr><td colspan="6" style="text-align:center;color:#9CA3AF;padding:1.5rem">此期間無資料</td></tr>';
 }
