@@ -593,10 +593,50 @@ let syncStatus = 'init';
 
 // ---- JSONP 單次呼叫(timeout 12秒)----
 function gasCall(params) {
-  // 先嘗試 JSONP，失敗再用 fetch（雙保險，解決 Safari ITP 擋第三方 script 的問題）
+  // 儲存類（save 開頭）資料量大，URL 放不下 → 改用 POST，把資料放 body
+  // （GET URL 太長會被 Apps Script 回 400，導致 JSONP 與 fetch 都失敗）
+  if (params.action && params.action.indexOf('save') === 0) {
+    return gasCallPost(params).then(result => {
+      if (result !== null) return result;
+      // POST 失敗才退回 JSONP/GET（小資料時仍可能成功）
+      return gasCallJSONP(params).then(r => r !== null ? r : gasCallFetch(params));
+    });
+  }
+  // 讀取類（loadAll 等）資料短 → 先 JSONP，失敗再 fetch
   return gasCallJSONP(params).then(result => {
     if (result !== null) return result;
     return gasCallFetch(params);
+  });
+}
+
+// 方法3：POST（資料放 body，不受 URL 長度限制）
+// 用 text/plain 避免觸發 CORS preflight（OPTIONS），Apps Script 才能正常回應
+function gasCallPost(params) {
+  return new Promise((resolve) => {
+    if (!GAS_URL) { resolve(null); return; }
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 25000);
+      fetch(GAS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(params),
+        signal: controller.signal,
+        redirect: 'follow'
+      })
+        .then(r => r.text())
+        .then(text => {
+          clearTimeout(timer);
+          let jsonStr = (text || '').trim();
+          const m = jsonStr.match(/^[a-zA-Z0-9_]+\((.*)\)[;\s]*$/s);
+          if (m) jsonStr = m[1];
+          try {
+            const json = JSON.parse(jsonStr);
+            resolve((json && json.ok) ? json.data : null);
+          } catch(e) { resolve(null); }
+        })
+        .catch(() => { clearTimeout(timer); resolve(null); });
+    } catch(e) { resolve(null); }
   });
 }
 
