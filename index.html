@@ -355,8 +355,11 @@ tr:hover td{background:#FAFAFA}
         <div id="short-alert" class="alert"></div>
         <div style="margin-bottom:14px">
           <div style="font-size:12px;color:#888;margin-bottom:6px"><span class="step-badge">1</span>教練與時間</div>
+          <div class="form-row" style="margin-bottom:10px">
+            <div class="fg"><label>我是哪位教練（登記教練）</label><select id="short-self-coach"><option value="">— 請選擇 —</option></select></div>
+            <div class="fg"><label>指定教練</label><select id="short-coach"><option value="">— 請選擇 —</option></select></div>
+          </div>
           <div class="form-row" style="margin-bottom:0">
-            <div class="fg"><label>登記教練</label><select id="short-coach"><option value="">— 請選擇 —</option></select></div>
             <div class="fg"><label>日期</label><input type="date" id="short-date"></div>
             <!-- ★ 時段下拉選單 -->
             <div class="fg">
@@ -429,7 +432,7 @@ tr:hover td{background:#FAFAFA}
       </div>
       <div class="card">
         <div class="card-title">短桿果嶺報名記錄</div>
-        <div class="ovx"><table><thead><tr><th>日期 / 登記時間</th><th>時段</th><th>教練</th><th>學員</th><th>人數</th><th>費用</th><th>備註</th><th></th></tr></thead>
+        <div class="ovx"><table><thead><tr><th>日期 / 登記時間</th><th>時段</th><th>登記教練</th><th>指定教練</th><th>學員</th><th>人數</th><th>費用</th><th>備註</th><th></th></tr></thead>
         <tbody id="short-tbody"></tbody></table></div>
       </div>
     </div>
@@ -532,7 +535,7 @@ tr:hover td{background:#FAFAFA}
       </div>
       <div class="card">
         <div class="card-title">短桿果嶺 — 收費明細 <span style="font-size:12px;font-weight:400;color:#9CA3AF;margin-left:4px">（代收代付）</span></div>
-        <div class="ovx"><table><thead><tr><th>日期</th><th>時段</th><th>教練</th><th>學員</th><th>人數</th><th>收款</th></tr></thead><tbody id="fin-short-tbody"></tbody></table></div>
+        <div class="ovx"><table><thead><tr><th>日期</th><th>時段</th><th>登記教練</th><th>指定教練</th><th>學員</th><th>人數</th><th>收款</th></tr></thead><tbody id="fin-short-tbody"></tbody></table></div>
       </div>
     </div>
 
@@ -1387,6 +1390,7 @@ function renderRegTable(){
 
 // ===== SHORT =====
 function initShortPage(){
+  fillSel('short-self-coach',false);
   fillSel('short-coach',false);
   const dateEl=document.getElementById('short-date'),notice=document.getElementById('short-admin-notice');
   if(currentRole==='admin'){dateEl.removeAttribute('min');notice.style.display='none';dateEl.value=todayISO();}
@@ -1459,14 +1463,15 @@ function confirmShortNewStudent(){document.getElementById('short-similar-box').c
 function resetShortFields(){shortSelectedStudentId=null;shortIsNewStudent=false;document.getElementById('short-stu-name').value='';document.getElementById('short-similar-box').classList.remove('show');document.getElementById('short-new-student-box').classList.remove('show');document.getElementById('short-existing-stu-info').style.display='none'}
 
 function submitShort(){
-  const coach=document.getElementById('short-coach').value,
+  const selfCoach=document.getElementById('short-self-coach').value,
+        coach=document.getElementById('short-coach').value,
         date=document.getElementById('short-date').value,
         time=getShortTime(),  // ★ 使用新函式取得時段
         stuName=document.getElementById('short-stu-name').value.trim();
   const count=parseInt(document.getElementById('short-count').value),note=document.getElementById('short-note').value.trim();
   const al=document.getElementById('short-alert');
   if(currentRole!=='admin'&&date<todayISO()){al.className='alert alert-danger';al.textContent='⛔ 不可選擇過去日期';return}
-  if(!coach||!date||!time||!stuName){al.className='alert alert-warn';al.textContent='請填寫教練、日期、時段及學員姓名';return}
+  if(!selfCoach||!coach||!date||!time||!stuName){al.className='alert alert-warn';al.textContent='請填寫登記教練、指定教練、日期、時段及學員姓名';return}
   if(!shortSelectedStudentId&&!shortIsNewStudent){const exact=students.find(s=>s.name===stuName);if(exact){shortSelectedStudentId=exact.id;}else{shortIsNewStudent=true;}}
   let stuId=shortSelectedStudentId;
   if(shortIsNewStudent){const sess=parseInt(document.getElementById('short-new-stu-sessions').value)||1;const ns={id:Date.now(),name:stuName,plan:'單堂',totalSessions:sess,source:'auto'};students.push(ns);sv('v3_students',students);saveToSheets('students');stuId=ns.id}
@@ -1474,7 +1479,7 @@ function submitShort(){
   const priceMode=(document.getElementById('short-price-mode')||{}).value||'fixed';
   const hours=priceMode==='hourly'?Math.max(1,Math.round(parseFloat((document.getElementById('short-hours')||{}).value||1)||1)):0;
   const shortAmount=priceMode==='hourly'?Math.round(shortHourlyRate*hours*count):shortRate*count;
-  shortRegs.push({id:now,createdAt:now,date,time,coach,studentId:stuId,studentName:stu.name,count,note,priceMode,hours,amount:shortAmount});
+  shortRegs.push({id:now,createdAt:now,date,time,selfCoach,coach,studentId:stuId,studentName:stu.name,count,note,priceMode,hours,amount:shortAmount});
   sv('v3_shortRegs',shortRegs);saveToSheets('shortRegs');
   al.className='alert alert-success';al.textContent='✓ 短桿果嶺報名成功：'+stu.name+' ／ '+date+' ／ 教練：'+coach;
   resetShortFields();document.getElementById('short-note').value='';renderShortTable();renderSchedule();renderStudents();
@@ -1497,10 +1502,12 @@ function clearShort(){
 function deleteShort(id){if(!confirm('確定刪除？'))return;shortRegs=shortRegs.filter(r=>r.id!==id);sv('v3_shortRegs',shortRegs);saveToSheets('shortRegs');renderShortTable();renderSchedule();renderStudents()}
 function renderShortTable(){
   const tbody=document.getElementById('short-tbody');if(!tbody)return;
-  if(!shortRegs.length){tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:#9CA3AF;padding:2rem">尚無短桿果嶺報名記錄</td></tr>';return}
+  if(!shortRegs.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:#9CA3AF;padding:2rem">尚無短桿果嶺報名記錄</td></tr>';return}
   tbody.innerHTML=[...shortRegs].sort((a,b)=>a.id-b.id).map(r=>`<tr>
     <td><span style="font-weight:600">${r.date}</span><span class="time-sub">登記 ${fmtTime(r.createdAt||r.id)}</span></td>
-    <td>${r.time}</td><td><span class="avatar">${r.coach.slice(0,2)}</span>${r.coach}</td>
+    <td>${r.time}</td>
+    <td>${r.selfCoach||'—'}</td>
+    <td><span class="avatar">${r.coach.slice(0,2)}</span>${r.coach}</td>
     <td style="font-weight:500">${r.studentName}</td><td>${r.count}</td>
     <td style="font-weight:600">NT$ ${r.amount.toLocaleString()}${r.priceMode==='hourly'?'<span class="time-sub">'+r.hours+'小時/人</span>':''}</td>
     <td style="color:#9CA3AF">${r.note||'—'}</td>
@@ -1586,7 +1593,7 @@ function downloadExcel(mode){
     return{'下場日期':r.date,'登記時間':fmtTime(r.createdAt||r.id),'學員姓名':r.studentName,'登記教練':r.selfCoach||'','指定教練':r.coach,'人數（教練上課時數）':r.count,'系統已購課訂單':r.feeType,'課堂數':sessions,'開班狀態':open?'開班':'未開班','一人開班':r.soloClass?'是':'否','是否改期':hasLog?'是':'否','改期原因':lastLog?lastLog.reason:'','備註':r.note||''}});
   const byCoach={};regs.forEach(r=>{const open=isClassOpen(r.date,r.coach);const sessions=r.sessions||r.count;if(!byCoach[r.coach])byCoach[r.coach]={openDays:new Set(),students:0,sessions:0,coachHours:0,fee:0};if(open){byCoach[r.coach].openDays.add(r.date);byCoach[r.coach].students+=r.count;byCoach[r.coach].sessions+=sessions;byCoach[r.coach].coachHours+=r.count;byCoach[r.coach].fee+=(r.coachFee||0)}});
   const coachRows=Object.entries(byCoach).map(([c,d])=>({'教練':c,'開班堂數':d.openDays.size,'學員總人次':d.students,'課堂數':d.sessions,'教練上課時數':d.coachHours,'教練費合計':Math.round(d.fee)}));
-  const shortRows=sRegs.map(r=>({'日期':r.date,'登記時間':fmtTime(r.createdAt||r.id),'時段':r.time,'教練':r.coach,'學員姓名':r.studentName,'人數':r.count,'計價方式':r.priceMode==='hourly'?'每小時':'每人固定','時數':r.priceMode==='hourly'?r.hours:'','收款':r.amount,'備註':r.note||''}));
+  const shortRows=sRegs.map(r=>({'日期':r.date,'登記時間':fmtTime(r.createdAt||r.id),'時段':r.time,'登記教練':r.selfCoach||'','指定教練':r.coach,'學員姓名':r.studentName,'人數':r.count,'計價方式':r.priceMode==='hourly'?'每小時':'每人固定','時數':r.priceMode==='hourly'?r.hours:'','收款':r.amount,'備註':r.note||''}));
   const summaryRows=[{'項目':'區間','數值':start+' 至 '+end},{'項目':'下場班總人次（開班）','數值':openRegs.reduce((s,r)=>s+r.count,0)},{'項目':'已開班課堂數','數值':openRegs.reduce((s,r)=>s+(r.sessions||r.count),0)},{'項目':'已開班教練上課時數','數值':openRegs.reduce((s,r)=>s+r.count,0)},{'項目':'應付國華費用（NT$）','數值':openRegs.reduce((s,r)=>s+(r.khFee||0),0)},{'項目':'教練費合計（僅開班）','數值':Math.round(openRegs.reduce((s,r)=>s+(r.coachFee||0),0))},{'項目':'短桿果嶺總收款','數值':sRegs.reduce((s,r)=>s+r.amount,0)},{'項目':'短桿果嶺人次','數值':sRegs.reduce((s,r)=>s+r.count,0)}];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(detailRows.length?detailRows:[{提示:'此區間無資料'}]),'下場班明細');
@@ -1620,7 +1627,7 @@ function renderFinance(){
   dt.innerHTML=regs.length?[...regs].sort((a,b)=>a.id-b.id).map(r=>{const open=isClassOpen(r.date,r.coach);const sessions=r.sessions||r.count;const openTag=open?'<span class="tag tag-green" style="font-size:10px">開班</span>':'<span class="tag tag-reschedule" style="font-size:10px">未開班</span>';const soloTag=r.soloClass?'<span class="tag tag-amber" style="font-size:10px;margin-left:4px"><i class="ti ti-lock"></i> 一人開班</span>':'';
     return `<tr${r.soloClass?' style="background:#FFFBEB"':open?'':' style="opacity:.6"'}><td>${r.date}</td><td>${r.studentName}</td><td>${r.coach}</td><td>${r.feeType}</td><td>${r.count}${soloTag}</td><td>${open?sessions+' 堂':'—'}</td><td>${open?r.count+' 人次':'—'}</td><td>${openTag}</td></tr>`}).join(''):'<tr><td colspan="8" style="text-align:center;color:#9CA3AF;padding:1.5rem">此期間無資料</td></tr>';
   const st=document.getElementById('fin-short-tbody');
-  st.innerHTML=sRegs.length?[...sRegs].sort((a,b)=>a.id-b.id).map(r=>`<tr><td>${r.date}</td><td>${r.time}</td><td>${r.coach}</td><td>${r.studentName}</td><td>${r.count}</td><td style="font-weight:600">NT$ ${r.amount.toLocaleString()}</td></tr>`).join(''):'<tr><td colspan="6" style="text-align:center;color:#9CA3AF;padding:1.5rem">此期間無資料</td></tr>';
+  st.innerHTML=sRegs.length?[...sRegs].sort((a,b)=>a.id-b.id).map(r=>`<tr><td>${r.date}</td><td>${r.time}</td><td>${r.selfCoach||'—'}</td><td>${r.coach}</td><td>${r.studentName}</td><td>${r.count}</td><td style="font-weight:600">NT$ ${r.amount.toLocaleString()}</td></tr>`).join(''):'<tr><td colspan="7" style="text-align:center;color:#9CA3AF;padding:1.5rem">此期間無資料</td></tr>';
 }
 
 // ===== SETTINGS =====
