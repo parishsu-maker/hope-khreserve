@@ -542,7 +542,7 @@ tr:hover td{background:#FAFAFA}
     <!-- 系統設定 -->
     <div id="page-settings" class="page">
       <div class="card"><div class="card-title">教練名單</div><div id="coach-list-ui"></div><hr class="divider"><div class="ilfx"><input type="text" id="new-coach" placeholder="新增教練姓名" style="width:180px;padding:8px 10px;border:1px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:'Noto Sans TC',sans-serif"><button class="btn btn-primary btn-sm" onclick="addCoach()">新增</button></div></div>
-      <div class="card"><div class="card-title">系統已購課訂單設定（下場班）</div><p style="font-size:12px;color:#888;margin-bottom:1rem"><i class="ti ti-lock"></i> 修改後僅影響新報名，舊記錄金額不變</p><div id="fee-types-ui"></div><hr class="divider"><div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap"><div class="fg" style="flex:2;min-width:160px"><label>訂單名稱</label><input type="text" id="new-fee-name" placeholder="例：個人套組第三堂"></div><div class="fg" style="flex:1;min-width:100px"><label>金額 (NT$)</label><input type="number" id="new-fee-amt" placeholder="例：3000" min="0"></div><button class="btn btn-primary btn-sm" onclick="addFeeType()" style="align-self:flex-end;height:36px">新增</button></div></div>
+      <div class="card"><div class="card-title">系統已購課訂單設定（下場班）</div><p style="font-size:12px;color:#888;margin-bottom:4px"><i class="ti ti-lock"></i> 修改後僅影響新報名，舊記錄金額不變；改名稱會同步更新舊報名的訂單名</p><div id="settings-fee-note" style="font-size:12px;margin-bottom:8px;min-height:16px"></div><div id="fee-types-ui"></div><hr class="divider"><div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap"><div class="fg" style="flex:2;min-width:160px"><label>訂單名稱</label><input type="text" id="new-fee-name" placeholder="例：個人套組第三堂"></div><div class="fg" style="flex:1;min-width:100px"><label>金額 (NT$)</label><input type="number" id="new-fee-amt" placeholder="例：3000" min="0"></div><button class="btn btn-primary btn-sm" onclick="addFeeType()" style="align-self:flex-end;height:36px">新增</button></div></div>
       <div class="card"><div class="card-title">費率設定</div><p style="font-size:12px;color:#888;margin-bottom:1rem"><i class="ti ti-lock"></i> 修改後僅影響新報名，舊記錄金額不變</p><div class="si"><span style="font-size:13px">國華球場費用（每人）</span><div class="ilfx"><span style="font-size:12px;color:#888">NT$/人</span><input type="number" id="kh-rate" style="width:90px;text-align:right;padding:6px 8px;border:1px solid #E0E0E0;border-radius:6px;font-family:'Noto Sans TC',sans-serif" onchange="saveKhRate(this.value)"></div></div><div class="si"><span style="font-size:13px">短桿果嶺費用（每人固定）</span><div class="ilfx"><span style="font-size:12px;color:#888">NT$/人</span><input type="number" id="short-rate" style="width:90px;text-align:right;padding:6px 8px;border:1px solid #E0E0E0;border-radius:6px;font-family:'Noto Sans TC',sans-serif" onchange="saveShortRate(this.value)"></div></div><div class="si"><span style="font-size:13px">短桿果嶺費用（每小時）</span><div class="ilfx"><span style="font-size:12px;color:#888">NT$/小時/人</span><input type="number" id="short-hourly-rate" style="width:90px;text-align:right;padding:6px 8px;border:1px solid #E0E0E0;border-radius:6px;font-family:'Noto Sans TC',sans-serif" onchange="saveShortHourlyRate(this.value)"></div></div></div>
       <div class="card"><div class="card-title">教練抽成費率（下場班）</div><p style="font-size:13px;color:#888;margin-bottom:4px">每帶一位學員的教練費，最低保障＝2倍</p><p style="font-size:12px;color:#888;margin-bottom:1rem"><i class="ti ti-lock"></i> 修改後僅影響新報名，舊記錄金額不變</p><div id="coach-fee-ui"></div></div>
     </div>
@@ -1284,7 +1284,7 @@ function initRegPage(){
   ensureArrays();
   fillSel('reg-self-coach',false);fillSel('sch-coach',true);fillSel('fin-coach',true);
   const fe=document.getElementById('reg-fee-type');fe.innerHTML='';
-  feeTypes.forEach(ft=>{const o=document.createElement('option');o.value=ft.name;o.textContent=ft.name;fe.appendChild(o)});
+  feeTypes.filter(ft=>!ft.hidden).forEach(ft=>{const o=document.createElement('option');o.value=ft.name;o.textContent=ft.name;fe.appendChild(o)});
   const dateEl=document.getElementById('reg-date');
   const notice=document.getElementById('reg-admin-notice');
   if(currentRole==='admin'){dateEl.removeAttribute('min');notice.style.display='none';}
@@ -1636,7 +1636,14 @@ function renderSettings(){
   document.getElementById('kh-rate').value=khRate;document.getElementById('short-rate').value=shortRate;document.getElementById('short-hourly-rate').value=shortHourlyRate;
   document.getElementById('coach-list-ui').innerHTML=coaches.map((c,i)=>`<div class="si"><div class="ilfx"><span class="avatar">${c.slice(0,2)}</span><span>${c}</span></div><button class="btn btn-danger btn-sm" onclick="removeCoach(${i})">移除</button></div>`).join('');
   document.getElementById('fee-types-ui').innerHTML=feeTypes.length
-    ? feeTypes.map((ft,i)=>`<div class="si"><span>${ft.name}</span><div class="ilfx"><input type="number" value="${ft.amount}" onchange="updateFeeAmt(${i},this.value)" style="width:90px;text-align:right;padding:5px 8px;border:1px solid #E0E0E0;border-radius:6px;font-family:'Noto Sans TC',sans-serif"><button class="btn btn-danger btn-sm" onclick="removeFeeType(${i})">刪除</button></div></div>`).join('')
+    ? feeTypes.map((ft,i)=>`<div class="si"${ft.hidden?' style="opacity:.55;background:#FAFAFA"':''}><div class="ilfx" style="flex:1;gap:6px">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <button class="btn btn-sm" onclick="moveFeeType(${i},-1)" ${i===0?'disabled style="opacity:.3;padding:0 6px"':'style="padding:0 6px"'} title="上移"><i class="ti ti-chevron-up"></i></button>
+          <button class="btn btn-sm" onclick="moveFeeType(${i},1)" ${i===feeTypes.length-1?'disabled style="opacity:.3;padding:0 6px"':'style="padding:0 6px"'} title="下移"><i class="ti ti-chevron-down"></i></button>
+        </div>
+        <input type="text" value="${(ft.name||'').replace(/"/g,'&quot;')}" onchange="updateFeeName(${i},this.value)" style="flex:1;min-width:120px;padding:5px 8px;border:1px solid #E0E0E0;border-radius:6px;font-family:'Noto Sans TC',sans-serif">
+        ${ft.hidden?'<span class="tag tag-amber" style="font-size:10px;white-space:nowrap"><i class="ti ti-eye-off"></i> 已隱藏</span>':''}
+      </div><div class="ilfx"><input type="number" value="${ft.amount}" onchange="updateFeeAmt(${i},this.value)" style="width:90px;text-align:right;padding:5px 8px;border:1px solid #E0E0E0;border-radius:6px;font-family:'Noto Sans TC',sans-serif"><button class="btn btn-sm" onclick="toggleFeeHidden(${i})" title="${ft.hidden?'顯示於報名畫面':'從報名畫面隱藏'}" style="padding:4px 8px"><i class="ti ${ft.hidden?'ti-eye':'ti-eye-off'}"></i></button><button class="btn btn-danger btn-sm" onclick="removeFeeType(${i})">刪除</button></div></div>`).join('')
     : '<div style="font-size:13px;color:#9CA3AF;padding:8px 0">載入中…</div>';
   document.getElementById('coach-fee-ui').innerHTML=coaches.map(c=>`<div class="si"><div class="ilfx"><span class="avatar">${c.slice(0,2)}</span><span>${c}</span></div><div class="ilfx"><span style="font-size:12px;color:#888">NT$/人</span><input type="number" value="${getCoachFee(c)}" onchange="updateCoachFee('${c}',this.value)" style="width:90px;text-align:right;padding:5px 8px;border:1px solid #E0E0E0;border-radius:6px;font-family:'Noto Sans TC',sans-serif"></div></div>`).join('');
 }
@@ -1668,7 +1675,54 @@ function addFeeType(){
   renderSettings();
 }
 function removeFeeType(i){feeTypes.splice(i,1);sv('v3_feeTypes',feeTypes);saveToSheets('settings');renderSettings()}
-function updateFeeAmt(i,v){feeTypes[i].amount=parseInt(v)||0;sv('v3_feeTypes',feeTypes)}
+function updateFeeAmt(i,v){feeTypes[i].amount=parseInt(v)||0;sv('v3_feeTypes',feeTypes);saveToSheets('settings')}
+function updateFeeName(i,v){
+  const newName=(v||'').trim();
+  const oldName=feeTypes[i].name;
+  if(!newName){ renderSettings(); return; } // 空白則還原
+  if(newName===oldName) return;
+  // 檢查重複名稱
+  if(feeTypes.some((ft,idx)=>idx!==i&&ft.name===newName)){
+    alert('已有相同名稱的訂單："'+newName+'"，請使用不同名稱');
+    renderSettings();
+    return;
+  }
+  // 連動更新：把所有用到舊名稱的報名記錄一起改名，避免脫鉤
+  let affected=0;
+  registrations.forEach(r=>{ if(r.feeType===oldName){ r.feeType=newName; affected++; } });
+  feeTypes[i].name=newName;
+  sv('v3_feeTypes',feeTypes);
+  if(affected>0){ sv('v3_regs',registrations); saveToSheets('regs'); }
+  saveToSheets('settings');
+  renderSettings();
+  renderRegTable();
+  if(affected>0){
+    const note=document.getElementById('settings-fee-note');
+    if(note){ note.textContent='✓ 已更新名稱，並同步更新 '+affected+' 筆使用此訂單的報名記錄'; note.style.color='#059669'; setTimeout(()=>{note.textContent='';},4000); }
+  }
+}
+function moveFeeType(i,dir){
+  const j=i+dir;
+  if(j<0||j>=feeTypes.length) return;
+  const tmp=feeTypes[i]; feeTypes[i]=feeTypes[j]; feeTypes[j]=tmp;
+  sv('v3_feeTypes',feeTypes);
+  saveToSheets('settings');
+  renderSettings();
+}
+function toggleFeeHidden(i){
+  feeTypes[i].hidden=!feeTypes[i].hidden;
+  sv('v3_feeTypes',feeTypes);
+  saveToSheets('settings');
+  renderSettings();
+  const note=document.getElementById('settings-fee-note');
+  if(note){
+    note.textContent=feeTypes[i].hidden
+      ? '✓ 已隱藏「'+feeTypes[i].name+'」，報名畫面不會出現（舊報名記錄不受影響）'
+      : '✓ 已重新顯示「'+feeTypes[i].name+'」於報名畫面';
+    note.style.color='#059669';
+    setTimeout(()=>{note.textContent='';},4000);
+  }
+}
 function updateCoachFee(c,v){coachFees[c]=parseInt(v)||0;sv('v3_coachFees',coachFees)}
 function saveKhRate(v){khRate=parseInt(v)||DEF_KH;sv('v3_khRate',khRate)}
 function saveShortRate(v){shortRate=parseInt(v)||DEF_SHORT;sv('v3_shortRate',shortRate);saveToSheets('settings')}
