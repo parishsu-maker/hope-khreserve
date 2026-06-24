@@ -64,6 +64,7 @@ body{font-family:'Noto Sans TC',sans-serif;background:#F2F2F0;color:#1A1A1A;min-
 .form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:10px}
 .fg{display:flex;flex-direction:column;gap:4px}
 .fg label{font-size:12px;color:#888;font-weight:500}
+.req::after{content:" *";color:#DC2626;font-weight:700}
 .fg input,.fg select{width:100%;padding:8px 10px;border:1px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:'Noto Sans TC',sans-serif;color:#1A1A1A;background:#fff;transition:border .12s;outline:none}
 .fg input:focus,.fg select:focus{border-color:#1A1A1A}
 .fg input[readonly]{background:#F7F7F7;color:#666}
@@ -279,18 +280,18 @@ tr:hover td{background:#FAFAFA}
         <div style="margin-bottom:14px">
           <div style="font-size:12px;color:#888;margin-bottom:6px"><span class="step-badge">1</span>教練登記</div>
           <div class="form-row" style="margin-bottom:0">
-            <div class="fg"><label>我是哪位教練</label><select id="reg-self-coach"><option value="">— 請選擇 —</option></select></div>
-            <div class="fg"><label>下場日期</label><input type="date" id="reg-date" onchange="onRegDateChange()"></div>
-            <div class="fg"><label>指定教練</label><select id="reg-coach" onchange="checkCoachSlots()"><option value="">— 請先選日期 —</option></select></div>
+            <div class="fg"><label class="req">我是哪位教練</label><select id="reg-self-coach"><option value="">— 請選擇 —</option></select></div>
+            <div class="fg"><label class="req">下場日期</label><input type="date" id="reg-date" onchange="onRegDateChange()"></div>
+            <div class="fg"><label class="req">指定教練</label><select id="reg-coach" onchange="checkCoachSlots()"><option value="">— 請先選日期 —</option></select></div>
           </div>
         </div>
         <div class="divider"></div>
         <div style="margin-bottom:14px">
           <div style="font-size:12px;color:#888;margin-bottom:6px"><span class="step-badge">2</span>學員資訊</div>
           <div class="form-row" style="margin-bottom:6px">
-            <div class="fg" style="grid-column:span 2"><label>學員姓名（輸入後系統自動比對）</label>
+            <div class="fg" style="grid-column:span 2"><label class="req">學員姓名（輸入後系統自動比對）</label>
               <input type="text" id="reg-stu-name" placeholder="輸入姓名..." oninput="onStuNameInput()" autocomplete="off"></div>
-            <div class="fg"><label>人數 <span style="font-weight:400;color:#9CA3AF;font-size:11px">(一對一請選2人)</span></label>
+            <div class="fg"><label class="req">人數 <span style="font-weight:400;color:#9CA3AF;font-size:11px">(一對一請選2人)</span></label>
               <select id="reg-count" onchange="syncCoachHours()"><option value="1">1人</option><option value="2">2人</option><option value="3">3人</option><option value="4">4人</option></select></div>
           </div>
           <div style="margin-bottom:6px">
@@ -322,7 +323,7 @@ tr:hover td{background:#FAFAFA}
           <div style="font-size:12px;color:#888;margin-bottom:6px"><span class="step-badge">3</span>課程資訊</div>
           <div class="form-row" style="margin-bottom:8px">
             <div class="fg"><label>程度</label><select id="reg-level"><option>完全初學</option><option>100桿以上</option><option>90–99桿</option><option>80–89桿</option><option>80桿以下</option></select></div>
-            <div class="fg"><label>系統已購課訂單</label><select id="reg-fee-type"></select></div>
+            <div class="fg"><label class="req">系統已購課訂單</label><select id="reg-fee-type"></select></div>
             <div class="fg"><label>課堂數</label><input type="number" id="reg-sessions" value="1" min="1" style="font-weight:600"></div>
             <div class="fg"><label>備註</label><input type="text" id="reg-note" placeholder="選填"></div>
           </div>
@@ -356,14 +357,14 @@ tr:hover td{background:#FAFAFA}
         <div style="margin-bottom:14px">
           <div style="font-size:12px;color:#888;margin-bottom:6px"><span class="step-badge">1</span>教練與時間</div>
           <div class="form-row" style="margin-bottom:10px">
-            <div class="fg"><label>我是哪位教練（登記教練）</label><select id="short-self-coach"><option value="">— 請選擇 —</option></select></div>
-            <div class="fg"><label>指定教練</label><select id="short-coach"><option value="">— 請選擇 —</option></select></div>
+            <div class="fg"><label class="req">我是哪位教練（登記教練）</label><select id="short-self-coach"><option value="">— 請選擇 —</option></select></div>
+            <div class="fg"><label class="req">指定教練</label><select id="short-coach"><option value="">— 請選擇 —</option></select></div>
           </div>
           <div class="form-row" style="margin-bottom:0">
-            <div class="fg"><label>日期</label><input type="date" id="short-date"></div>
+            <div class="fg"><label class="req">日期</label><input type="date" id="short-date"></div>
             <!-- ★ 時段下拉選單 -->
             <div class="fg">
-              <label>時段</label>
+              <label class="req">時段</label>
               <select id="short-time-select" onchange="onShortTimeChange()">
                 <option value="">— 請選擇時段 —</option>
                 <option value="12:00–13:00">12:00–13:00</option>
@@ -386,9 +387,9 @@ tr:hover td{background:#FAFAFA}
         <div style="margin-bottom:14px">
           <div style="font-size:12px;color:#888;margin-bottom:6px"><span class="step-badge">2</span>學員資訊</div>
           <div class="form-row" style="margin-bottom:6px">
-            <div class="fg" style="grid-column:span 2"><label>學員姓名</label>
+            <div class="fg" style="grid-column:span 2"><label class="req">學員姓名</label>
               <input type="text" id="short-stu-name" placeholder="輸入姓名..." oninput="onShortStuNameInput()" autocomplete="off" spellcheck="false"></div>
-            <div class="fg"><label>人數</label>
+            <div class="fg"><label class="req">人數</label>
               <select id="short-count" onchange="calcShortFee()"><option value="1">1人</option><option value="2">2人</option><option value="3">3人</option><option value="4">4人</option><option value="5">5人</option><option value="6">6人</option></select></div>
           </div>
           <div class="similar-box" id="short-similar-box">
@@ -409,7 +410,7 @@ tr:hover td{background:#FAFAFA}
         <div style="margin-bottom:14px">
           <div style="font-size:12px;color:#888;margin-bottom:6px"><span class="step-badge">3</span>費用</div>
           <div class="form-row" style="margin-bottom:8px">
-            <div class="fg"><label>計價方式</label>
+            <div class="fg"><label class="req">計價方式</label>
               <select id="short-price-mode" onchange="onShortPriceModeChange()">
                 <option value="fixed">每人固定</option>
                 <option value="hourly">每小時計價（2026/7/1 開始）</option>
@@ -1241,6 +1242,14 @@ function todayISO(){
 function isClosed(d){return!!closedDates[d]}
 function isPast(date){return date<todayISO()}
 function getCoachFee(c){return coachFees[c]!==undefined?coachFees[c]:DEF_COACH_FEE}
+// 判斷一筆報名是否為不計費：以「訂單設定」為準（即時查），舊報名也會跟著訂單設定走；
+// 若訂單已刪除/查不到，則回退看報名當初寫死的 r.noCharge
+function isRegNoCharge(r){
+  if(!r) return false;
+  const ft=feeTypes.find(f=>f.name===r.feeType);
+  if(ft) return !!ft.noCharge;     // 訂單還在 → 以現在的設定為準
+  return !!r.noCharge;             // 訂單已刪 → 用報名當初的標記
+}
 function calcLockedCoachFee(cn,count){const f=getCoachFee(cn);return Math.max(f*count,f*2)}
 function isClassOpen(date,coach){return registrations.filter(r=>r.date===date&&r.coach===coach).reduce((s,r)=>s+r.count,0)>=2}
 function getUsedGolf(sid){return registrations.filter(r=>r.studentId===sid&&isClassOpen(r.date,r.coach)).reduce((s,r)=>s+(r.sessions||r.count),0)}
@@ -1372,9 +1381,14 @@ function submitReg(){
   const count=parseInt(document.getElementById('reg-count').value),level=document.getElementById('reg-level').value,feeType=document.getElementById('reg-fee-type').value,note=document.getElementById('reg-note').value.trim();
   const sessions=parseInt(document.getElementById('reg-sessions').value)||1;
   const al=document.getElementById('reg-alert');
+  if(!selfCoach){al.className='alert alert-warn';al.textContent='請選擇「我是哪位教練」';return}
+  if(!date){al.className='alert alert-warn';al.textContent='請選擇「下場日期」';return}
+  if(!coach){al.className='alert alert-warn';al.textContent='請選擇「指定教練」';return}
+  if(!stuName){al.className='alert alert-warn';al.textContent='請輸入「學員姓名」';return}
+  if(!count||count<1){al.className='alert alert-warn';al.textContent='請選擇「人數」';return}
+  if(!feeType){al.className='alert alert-warn';al.textContent='請選擇「系統已購課訂單」';return}
   if(currentRole!=='admin'&&date<todayISO()){al.className='alert alert-danger';al.textContent='⛔ 不可選擇過去日期';return}
   if(isClosed(date)){al.className='alert alert-danger';al.textContent='⛔ 此日為封場日，無法報名';return}
-  if(!selfCoach||!date||!coach||!stuName){al.className='alert alert-warn';al.textContent='請填寫所有必填欄位';return}
   if(!selectedStudentId&&!isNewStudent){const exactStu=students.find(s=>s.name===stuName);if(exactStu){selectedStudentId=exactStu.id;}else{isNewStudent=true;}}
   let stuId=selectedStudentId;
   if(isNewStudent){const sess=parseInt(document.getElementById('new-stu-sessions').value)||1;const ns={id:Date.now(),name:stuName,plan:'單堂',totalSessions:sess,source:'auto'};students.push(ns);sv('v3_students',students);saveToSheets('students');stuId=ns.id}
@@ -1419,7 +1433,7 @@ function renderRegTable(){
     const hasLog=r.rescheduleLog&&r.rescheduleLog.length>0,lastLog=hasLog?r.rescheduleLog[r.rescheduleLog.length-1]:null;
     const noteCell=hasLog?`<span class="tag tag-amber" style="font-size:10px;margin-right:4px">改期</span><span style="font-size:12px;color:#9CA3AF">原 ${lastLog.from}${lastLog.reason&&lastLog.reason!=='未填寫'?' — '+lastLog.reason:''}</span>`:`<span style="font-size:12px;color:#9CA3AF">${r.note||'—'}</span>`;
     const soloTag=r.soloClass?'<span class="tag tag-reschedule" style="font-size:10px;margin-left:4px"><i class="ti ti-lock"></i> 一人開班</span>':'';
-    const noChargeTag=r.noCharge?'<span class="tag" style="font-size:10px;margin-left:4px;background:#EDE9FE;color:#6D28D9"><i class="ti ti-cash-off"></i> 不計費</span>':'';
+    const noChargeTag=isRegNoCharge(r)?'<span class="tag" style="font-size:10px;margin-left:4px;background:#EDE9FE;color:#6D28D9"><i class="ti ti-cash-off"></i> 不計費</span>':'';
     const sessions=r.sessions||r.count;
     return `<tr><td><span style="font-weight:600">${r.date}</span><span class="time-sub">登記 ${fmtTime(r.createdAt||r.id)}</span></td>
       <td><span class="avatar">${(r.selfCoach||'?').slice(0,2)}</span>${r.selfCoach||'—'}</td>
@@ -1512,9 +1526,16 @@ function submitShort(){
         time=getShortTime(),  // ★ 使用新函式取得時段
         stuName=document.getElementById('short-stu-name').value.trim();
   const count=parseInt(document.getElementById('short-count').value),note=document.getElementById('short-note').value.trim();
+  const priceModeCheck=(document.getElementById('short-price-mode')||{}).value||'';
   const al=document.getElementById('short-alert');
+  if(!selfCoach){al.className='alert alert-warn';al.textContent='請選擇「我是哪位教練（登記教練）」';return}
+  if(!coach){al.className='alert alert-warn';al.textContent='請選擇「指定教練」';return}
+  if(!date){al.className='alert alert-warn';al.textContent='請選擇「日期」';return}
+  if(!time){al.className='alert alert-warn';al.textContent='請選擇「時段」';return}
+  if(!stuName){al.className='alert alert-warn';al.textContent='請輸入「學員姓名」';return}
+  if(!count||count<1){al.className='alert alert-warn';al.textContent='請選擇「人數」';return}
+  if(!priceModeCheck){al.className='alert alert-warn';al.textContent='請選擇「計價方式」';return}
   if(currentRole!=='admin'&&date<todayISO()){al.className='alert alert-danger';al.textContent='⛔ 不可選擇過去日期';return}
-  if(!selfCoach||!coach||!date||!time||!stuName){al.className='alert alert-warn';al.textContent='請填寫登記教練、指定教練、日期、時段及學員姓名';return}
   if(!shortSelectedStudentId&&!shortIsNewStudent){const exact=students.find(s=>s.name===stuName);if(exact){shortSelectedStudentId=exact.id;}else{shortIsNewStudent=true;}}
   let stuId=shortSelectedStudentId;
   if(shortIsNewStudent){const sess=parseInt(document.getElementById('short-new-stu-sessions').value)||1;const ns={id:Date.now(),name:stuName,plan:'單堂',totalSessions:sess,source:'auto'};students.push(ns);sv('v3_students',students);saveToSheets('students');stuId=ns.id}
@@ -1631,14 +1652,14 @@ function downloadExcel(mode){
   else{start=document.getElementById('export-start').value;end=document.getElementById('export-end').value;if(!start||!end){alert('請選擇日期');return}if(start>end){alert('開始日期不能晚於結束日期');return}label=start+'_to_'+end}
   const regs=registrations.filter(r=>r.date>=start&&r.date<=end).sort((a,b)=>a.id-b.id);
   const sRegs=shortRegs.filter(r=>r.date>=start&&r.date<=end).sort((a,b)=>a.id-b.id);
-  const chargeRegs=regs.filter(r=>!r.noCharge);  // 統計用：排除不計費課程
+  const chargeRegs=regs.filter(r=>!isRegNoCharge(r));  // 統計用：排除不計費課程（以訂單設定為準）
   const openRegs=chargeRegs.filter(r=>isClassOpen(r.date,r.coach));
   const detailRows=regs.map(r=>{const open=isClassOpen(r.date,r.coach);const hasLog=r.rescheduleLog&&r.rescheduleLog.length>0;const lastLog=hasLog?r.rescheduleLog[r.rescheduleLog.length-1]:null;const sessions=r.sessions||r.count;
-    return{'下場日期':r.date,'登記時間':fmtTime(r.createdAt||r.id),'學員姓名':r.studentName,'登記教練':r.selfCoach||'','指定教練':r.coach,'人數（教練上課時數）':r.count,'系統已購課訂單':r.feeType,'課堂數':sessions,'開班狀態':open?'開班':'未開班','一人開班':r.soloClass?'是':'否','不計費課程':r.noCharge?'是':'否','是否改期':hasLog?'是':'否','改期原因':lastLog?lastLog.reason:'','備註':r.note||''}});
+    return{'下場日期':r.date,'登記時間':fmtTime(r.createdAt||r.id),'學員姓名':r.studentName,'登記教練':r.selfCoach||'','指定教練':r.coach,'人數（教練上課時數）':r.count,'系統已購課訂單':r.feeType,'課堂數':sessions,'開班狀態':open?'開班':'未開班','一人開班':r.soloClass?'是':'否','不計費課程':isRegNoCharge(r)?'是':'否','是否改期':hasLog?'是':'否','改期原因':lastLog?lastLog.reason:'','備註':r.note||''}});
   const byCoach={};chargeRegs.forEach(r=>{const open=isClassOpen(r.date,r.coach);const sessions=r.sessions||r.count;if(!byCoach[r.coach])byCoach[r.coach]={openDays:new Set(),students:0,sessions:0,coachHours:0,fee:0};if(open){byCoach[r.coach].openDays.add(r.date);byCoach[r.coach].students+=r.count;byCoach[r.coach].sessions+=sessions;byCoach[r.coach].coachHours+=r.count;byCoach[r.coach].fee+=(r.coachFee||0)}});
   const coachRows=Object.entries(byCoach).map(([c,d])=>({'教練':c,'開班堂數':d.openDays.size,'學員總人次':d.students,'課堂數':d.sessions,'教練上課時數':d.coachHours,'教練費合計':Math.round(d.fee)}));
   const shortRows=sRegs.map(r=>({'日期':r.date,'登記時間':fmtTime(r.createdAt||r.id),'時段':r.time,'登記教練':r.selfCoach||'','指定教練':r.coach,'學員姓名':r.studentName,'人數':r.count,'計價方式':r.priceMode==='hourly'?'每小時':'每人固定','時數':r.priceMode==='hourly'?r.hours:'','收款':r.amount,'備註':r.note||''}));
-  const noChargeRows=registrations.filter(r=>r.noCharge&&r.date>=start&&r.date<=end).sort((a,b)=>a.id-b.id).map(r=>({'日期':r.date,'登記時間':fmtTime(r.createdAt||r.id),'登記教練':r.selfCoach||'','指定教練':r.coach,'學員姓名':r.studentName,'人數':r.count,'系統已購課訂單':r.feeType,'備註':r.note||''}));
+  const noChargeRows=registrations.filter(r=>isRegNoCharge(r)&&r.date>=start&&r.date<=end).sort((a,b)=>a.id-b.id).map(r=>({'日期':r.date,'登記時間':fmtTime(r.createdAt||r.id),'登記教練':r.selfCoach||'','指定教練':r.coach,'學員姓名':r.studentName,'人數':r.count,'系統已購課訂單':r.feeType,'備註':r.note||''}));
   const summaryRows=[{'項目':'區間','數值':start+' 至 '+end},{'項目':'下場班總人次（開班）','數值':openRegs.reduce((s,r)=>s+r.count,0)},{'項目':'已開班課堂數','數值':openRegs.reduce((s,r)=>s+(r.sessions||r.count),0)},{'項目':'已開班教練上課時數','數值':openRegs.reduce((s,r)=>s+r.count,0)},{'項目':'應付國華費用（NT$）','數值':openRegs.reduce((s,r)=>s+(r.khFee||0),0)},{'項目':'教練費合計（僅開班）','數值':Math.round(openRegs.reduce((s,r)=>s+(r.coachFee||0),0))},{'項目':'短桿果嶺總收款','數值':sRegs.reduce((s,r)=>s+r.amount,0)},{'項目':'短桿果嶺人次','數值':sRegs.reduce((s,r)=>s+r.count,0)}];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(detailRows.length?detailRows:[{提示:'此區間無資料'}]),'下場班明細');
@@ -1652,7 +1673,7 @@ function renderFinance(){
   ensureArrays();
   fillSel('fin-coach',true);
   const month=(document.getElementById('fin-month')||{}).value||'',fc=(document.getElementById('fin-coach')||{}).value||'';
-  let regs=registrations.filter(r=>!r.noCharge);if(month)regs=regs.filter(r=>r.date.startsWith(month));if(fc)regs=regs.filter(r=>r.coach===fc);
+  let regs=registrations.filter(r=>!isRegNoCharge(r));if(month)regs=regs.filter(r=>r.date.startsWith(month));if(fc)regs=regs.filter(r=>r.coach===fc);
   let sRegs=shortRegs;if(month)sRegs=sRegs.filter(r=>r.date.startsWith(month));
   const openRegs=regs.filter(r=>isClassOpen(r.date,r.coach));
   const totalStu=openRegs.reduce((s,r)=>s+r.count,0),totalKH=openRegs.reduce((s,r)=>s+(r.khFee!==undefined?r.khFee:r.count*khRate),0);
@@ -1677,7 +1698,7 @@ function renderFinance(){
   // 不計費課程明細：從原始 registrations 篩出 noCharge（依月份/教練篩選），不列入上方結帳統計
   const nt=document.getElementById('fin-nocharge-tbody');
   if(nt){
-    let ncRegs=registrations.filter(r=>r.noCharge);
+    let ncRegs=registrations.filter(r=>isRegNoCharge(r));
     if(month)ncRegs=ncRegs.filter(r=>r.date.startsWith(month));
     if(fc)ncRegs=ncRegs.filter(r=>r.coach===fc);
     nt.innerHTML=ncRegs.length?[...ncRegs].sort((a,b)=>a.id-b.id).map(r=>`<tr style="background:#FAF5FF"><td>${r.date}</td><td>${r.selfCoach||'—'}</td><td style="font-weight:500">${r.studentName}</td><td>${r.coach}</td><td>${r.feeType}</td><td>${r.count}</td><td style="color:#9CA3AF">${r.note||'—'}</td></tr>`).join(''):'<tr><td colspan="7" style="text-align:center;color:#9CA3AF;padding:1.5rem">此期間無不計費課程</td></tr>';
@@ -1793,8 +1814,8 @@ function toggleFeeNoCharge(i){
     setTimeout(()=>{note.textContent='';},5000);
   }
 }
-function updateCoachFee(c,v){coachFees[c]=parseInt(v)||0;sv('v3_coachFees',coachFees)}
-function saveKhRate(v){khRate=parseInt(v)||DEF_KH;sv('v3_khRate',khRate)}
+function updateCoachFee(c,v){coachFees[c]=parseInt(v)||0;sv('v3_coachFees',coachFees);saveToSheets('settings')}
+function saveKhRate(v){khRate=parseInt(v)||DEF_KH;sv('v3_khRate',khRate);saveToSheets('settings')}
 function saveShortRate(v){shortRate=parseInt(v)||DEF_SHORT;sv('v3_shortRate',shortRate);saveToSheets('settings')}
 function saveShortHourlyRate(v){shortHourlyRate=parseInt(v)||DEF_SHORT_HOURLY;sv('v3_shortHourlyRate',shortHourlyRate);saveToSheets('settings')}
 
