@@ -549,7 +549,7 @@ tr:hover td{background:#FAFAFA}
       <div class="card"><div class="card-title">教練名單</div><div id="coach-list-ui"></div><hr class="divider"><div class="ilfx"><input type="text" id="new-coach" placeholder="新增教練姓名" style="width:180px;padding:8px 10px;border:1px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:'Noto Sans TC',sans-serif"><button class="btn btn-primary btn-sm" onclick="addCoach()">新增</button></div></div>
       <div class="card"><div class="card-title">系統已購課訂單設定（下場班）</div><p style="font-size:12px;color:#888;margin-bottom:4px"><i class="ti ti-lock"></i> 修改後僅影響新報名，舊記錄金額不變；改名稱會同步更新舊報名的訂單名</p><div id="settings-fee-note" style="font-size:12px;margin-bottom:8px;min-height:16px"></div><div id="fee-types-ui"></div><hr class="divider"><div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap"><div class="fg" style="flex:2;min-width:160px"><label>訂單名稱</label><input type="text" id="new-fee-name" placeholder="例：個人套組第三堂"></div><div class="fg" style="flex:1;min-width:100px"><label>金額 (NT$)</label><input type="number" id="new-fee-amt" placeholder="例：3000" min="0"></div><button class="btn btn-primary btn-sm" onclick="addFeeType()" style="align-self:flex-end;height:36px">新增</button></div></div>
       <div class="card"><div class="card-title">費率設定</div><p style="font-size:12px;color:#888;margin-bottom:1rem"><i class="ti ti-lock"></i> 修改後僅影響新報名，舊記錄金額不變</p><div class="si"><span style="font-size:13px">國華球場費用（每人）</span><div class="ilfx"><span style="font-size:12px;color:#888">NT$/人</span><input type="number" id="kh-rate" style="width:90px;text-align:right;padding:6px 8px;border:1px solid #E0E0E0;border-radius:6px;font-family:'Noto Sans TC',sans-serif" onchange="saveKhRate(this.value)"></div></div><div class="si"><span style="font-size:13px">短桿果嶺費用（每人固定）</span><div class="ilfx"><span style="font-size:12px;color:#888">NT$/人</span><input type="number" id="short-rate" style="width:90px;text-align:right;padding:6px 8px;border:1px solid #E0E0E0;border-radius:6px;font-family:'Noto Sans TC',sans-serif" onchange="saveShortRate(this.value)"></div></div><div class="si"><span style="font-size:13px">短桿果嶺費用（每小時）</span><div class="ilfx"><span style="font-size:12px;color:#888">NT$/小時/人</span><input type="number" id="short-hourly-rate" style="width:90px;text-align:right;padding:6px 8px;border:1px solid #E0E0E0;border-radius:6px;font-family:'Noto Sans TC',sans-serif" onchange="saveShortHourlyRate(this.value)"></div></div></div>
-      <div class="card"><div class="card-title">教練抽成費率（下場班）</div><p style="font-size:13px;color:#888;margin-bottom:4px">每帶一位學員的教練費，最低保障＝2倍</p><p style="font-size:12px;color:#888;margin-bottom:1rem"><i class="ti ti-lock"></i> 修改後僅影響新報名，舊記錄金額不變</p><div id="coach-fee-ui"></div></div>
+      <div class="card"><div class="card-title">教練抽成費率（下場班）</div><p style="font-size:13px;color:#888;margin-bottom:4px">依學員人頭計費；若該時段設為「一人開班」，則保障雙倍費率（視為滿班）</p><p style="font-size:12px;color:#888;margin-bottom:1rem"><i class="ti ti-lock"></i> 修改後僅影響新報名，舊記錄金額不變</p><div id="coach-fee-ui"></div><hr class="divider"><div id="recalc-fee-note" style="font-size:12px;margin-bottom:8px;min-height:16px"></div><button class="btn btn-warning btn-sm" onclick="recalcAllCoachFees()"><i class="ti ti-refresh"></i> 重新計算所有歷史教練費</button><p style="font-size:11px;color:#9CA3AF;margin-top:6px">用於修正過去因計算錯誤產生的教練費；會依目前的人頭計價規則（一人開班才雙倍）重新套用到所有已存在的下場班報名記錄</p></div>
     </div>
 
   </div><!-- /main -->
@@ -1250,7 +1250,7 @@ function isRegNoCharge(r){
   if(ft) return !!ft.noCharge;     // 訂單還在 → 以現在的設定為準
   return !!r.noCharge;             // 訂單已刪 → 用報名當初的標記
 }
-function calcLockedCoachFee(cn,count){const f=getCoachFee(cn);return Math.max(f*count,f*2)}
+function calcLockedCoachFee(cn,count,solo){const f=getCoachFee(cn);return solo?f*2:f*count}
 function isClassOpen(date,coach){return registrations.filter(r=>r.date===date&&r.coach===coach).reduce((s,r)=>s+r.count,0)>=2}
 function getUsedGolf(sid){return registrations.filter(r=>r.studentId===sid&&isClassOpen(r.date,r.coach)).reduce((s,r)=>s+(r.sessions||r.count),0)}
 function getRemain(s){return s.totalSessions-getUsedGolf(s.id)}
@@ -1408,7 +1408,7 @@ function submitReg(){
   }
   const ft=feeTypes.find(f=>f.name===feeType),now=Date.now();
   const noCharge=!!(ft&&ft.noCharge);
-  registrations.push({id:now,createdAt:now,date,selfCoach,coach,studentId:stuId,studentName:stu.name,count,sessions,level,feeType,note,soloClass,noCharge,amount:noCharge?0:(ft?ft.amount:0),khFee:noCharge?0:count*khRate,coachFee:noCharge?0:calcLockedCoachFee(coach,count)});
+  registrations.push({id:now,createdAt:now,date,selfCoach,coach,studentId:stuId,studentName:stu.name,count,sessions,level,feeType,note,soloClass,noCharge,amount:noCharge?0:(ft?ft.amount:0),khFee:noCharge?0:count*khRate,coachFee:noCharge?0:calcLockedCoachFee(coach,count,soloClass)});
   sv('v3_regs',registrations);saveToSheets('regs');
   al.className='alert alert-success';al.textContent='✓ 報名成功：'+stu.name+(isNewStudent?' （已自動建檔）':'')+' ／ '+date+' ／ 教練：'+coach+(soloClass?' ／ 一人開班':'');
   resetStudentFields();document.getElementById('reg-sessions').value=1;syncCoachHours();
@@ -1815,6 +1815,23 @@ function toggleFeeNoCharge(i){
   }
 }
 function updateCoachFee(c,v){coachFees[c]=parseInt(v)||0;sv('v3_coachFees',coachFees);saveToSheets('settings')}
+function recalcAllCoachFees(){
+  if(!registrations.length){alert('目前沒有下場班報名記錄');return}
+  if(!confirm('將依「人頭計費，一人開班才雙倍」規則，重新計算所有下場班報名的教練費（教練費率以目前設定為準），確定執行？此動作無法復原。'))return;
+  let changed=0;
+  registrations.forEach(r=>{
+    const correct = isRegNoCharge(r) ? 0 : calcLockedCoachFee(r.coach, r.count, !!r.soloClass);
+    if(r.coachFee!==correct){ r.coachFee=correct; changed++; }
+  });
+  if(changed>0){ sv('v3_regs',registrations); saveToSheets('regs'); }
+  const note=document.getElementById('recalc-fee-note');
+  if(note){
+    note.textContent = changed>0 ? ('✓ 已修正 '+changed+' 筆報名的教練費') : '目前所有記錄的教練費都已正確，無需修正';
+    note.style.color = changed>0 ? '#059669' : '#888';
+    setTimeout(()=>{note.textContent='';},6000);
+  }
+  renderRegTable();renderFinance();
+}
 function saveKhRate(v){khRate=parseInt(v)||DEF_KH;sv('v3_khRate',khRate);saveToSheets('settings')}
 function saveShortRate(v){shortRate=parseInt(v)||DEF_SHORT;sv('v3_shortRate',shortRate);saveToSheets('settings')}
 function saveShortHourlyRate(v){shortHourlyRate=parseInt(v)||DEF_SHORT_HOURLY;sv('v3_shortHourlyRate',shortHourlyRate);saveToSheets('settings')}
