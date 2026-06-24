@@ -1310,7 +1310,7 @@ function renderSchedule(){
         const rs=registrations.filter(r=>r.date===date&&r.coach===coach);
         const total=rs.reduce((s,r)=>s+r.count,0);
         const slots=[1,2,3,4].map(i=>`<span class="slot-dot ${i<=total?'dot-filled':'dot-empty'}"></span>`).join('');
-        const names=rs.map(r=>r.studentName+(r.count>1?'×'+r.count:'')).join('、');
+        const names=rs.map(r=>r.studentName+(r.count>1?'×'+r.count:'')+(r.level?'<span style="color:#C2C8C5">（'+r.level+'）</span>':'')).join('、');
         let tag='';
         if(total>=4)tag='<span class="tag tag-red">額滿</span>';
         else if(isSoloClass(date,coach))tag='<span class="tag tag-reschedule"><i class="ti ti-lock"></i> 一人開班</span>';
