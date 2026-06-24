@@ -730,6 +730,38 @@ function markPending(type){
   _savePendingIds();
 }
 
+// ===== 刪除墓碑(tombstone)：記錄被刪除的 id，避免同步時被 Sheets 舊資料加回來 =====
+// 持久化到 localStorage：即使重整，已刪除的 id 仍會被擋住，直到 Sheets 確認也沒有了才清除
+function _loadDeletedIds(){
+  try{
+    const raw=JSON.parse(localStorage.getItem('v3_deletedIds')||'{}');
+    return {
+      regs:      new Set(raw.regs||[]),
+      shortRegs: new Set(raw.shortRegs||[]),
+      students:  new Set(raw.students||[]),
+    };
+  }catch(e){ return { regs:new Set(), shortRegs:new Set(), students:new Set() }; }
+}
+let _deletedIds = _loadDeletedIds();
+function _saveDeletedIds(){
+  try{
+    localStorage.setItem('v3_deletedIds', JSON.stringify({
+      regs:      [..._deletedIds.regs],
+      shortRegs: [..._deletedIds.shortRegs],
+      students:  [..._deletedIds.students],
+    }));
+  }catch(e){}
+}
+// 標記某 id 為已刪除
+function markDeleted(type,id){
+  if(!_deletedIds[type]) return;
+  _deletedIds[type].add(id);
+  // 同時從 pending 移除（已刪除就不需要再當「待保留的新資料」）
+  if(_pendingIds[type]) _pendingIds[type].delete(id);
+  _saveDeletedIds();
+  _savePendingIds();
+}
+
 function saveToSheets(type) {
   // 記錄最新要存的 type(去重複排程)
   _pendingSave[type] = true;
@@ -838,17 +870,21 @@ async function loadFromSheets() {
   // 同步策略：Sheets 是所有裝置的共同資料庫，以 Sheets 為唯一真相來源。
   // 但「剛在本機 save、Sheets 還沒寫完」的資料要短暫保留，避免被舊版蓋掉。
   // 用 _pendingIds 記錄本機正在儲存中、Sheets 還沒確認的 id。
-  function mergeRemoteFirst(localArr, remoteArr, pendingSet) {
+  function mergeRemoteFirst(localArr, remoteArr, pendingSet, deletedSet) {
     if (!Array.isArray(remoteArr)) return localArr;
-    // 以 Sheets 資料為主
-    const result = [...remoteArr];
+    // 以 Sheets 資料為主，但排除「已刪除墓碑」中的 id（避免剛刪的被加回來）
+    const result = remoteArr.filter(r => !(deletedSet && deletedSet.has(r.id)));
     const remoteIds = new Set(remoteArr.map(r => r.id));
     // 本機有、但 Sheets 還沒有，且正在儲存中的，保留（避免剛存的被洗掉）
     localArr.forEach(r => {
-      if (!remoteIds.has(r.id) && pendingSet.has(r.id)) {
+      if (!remoteIds.has(r.id) && pendingSet.has(r.id) && !(deletedSet && deletedSet.has(r.id))) {
         result.push(r);
       }
     });
+    // 清理墓碑：若某個已刪除 id 在 Sheets 也確實不存在了，代表刪除已同步成功，可移除墓碑
+    if (deletedSet) {
+      [...deletedSet].forEach(id => { if (!remoteIds.has(id)) deletedSet.delete(id); });
+    }
     return result;
   }
 
@@ -865,7 +901,7 @@ async function loadFromSheets() {
     const remote = data.regs
       .map(r => ({ ...r, date: normalizeDate(r.date, yearFromCreatedAt(r.createdAt)) }))
       .filter(r => validDate(r.date));
-    registrations = mergeRemoteFirst(registrations, remote, _pendingIds.regs);
+    registrations = mergeRemoteFirst(registrations, remote, _pendingIds.regs, _deletedIds.regs);
   }
 
   // 短桿果嶺報名 — 以 Sheets 為主
@@ -873,12 +909,12 @@ async function loadFromSheets() {
     const remote = data.shortRegs
       .map(r => ({ ...r, date: normalizeDate(r.date, yearFromCreatedAt(r.createdAt)) }))
       .filter(r => validDate(r.date));
-    shortRegs = mergeRemoteFirst(shortRegs, remote, _pendingIds.shortRegs);
+    shortRegs = mergeRemoteFirst(shortRegs, remote, _pendingIds.shortRegs, _deletedIds.shortRegs);
   }
 
   // 學員 — 以 Sheets 為主
   if (Array.isArray(data.students)) {
-    students = mergeRemoteFirst(students, data.students, _pendingIds.students);
+    students = mergeRemoteFirst(students, data.students, _pendingIds.students, _deletedIds.students);
   }
 
   // 排班：Sheets 為主（行政端設定），normalizeDate 後去重，丟掉年份錯的
@@ -930,6 +966,7 @@ async function loadFromSheets() {
   sv('v3_shortHourlyRate', shortHourlyRate);
 
   isOnline = true;
+  _saveDeletedIds(); // 合併中可能已清理掉同步成功的墓碑，存回
 
   // 連線恢復後：若有先前離線/失敗未上傳的資料（pending 中仍存在於本機但 Sheets 沒有），自動補傳一次
   try{
@@ -1370,7 +1407,7 @@ function clearReg(){
   const cb=document.getElementById('reg-solo-class');
   if(cb.checked){cb.checked=false;onSoloClassChange();}
 }
-function deleteReg(id){if(!confirm('確定刪除此筆報名？'))return;registrations=registrations.filter(r=>r.id!==id);sv('v3_regs',registrations);saveToSheets('regs');renderRegTable();renderSchedule();renderStudents()}
+function deleteReg(id){if(!confirm('確定刪除此筆報名？'))return;markDeleted('regs',id);registrations=registrations.filter(r=>r.id!==id);sv('v3_regs',registrations);saveToSheets('regs');renderRegTable();renderSchedule();renderStudents()}
 function renderRegTable(){
   const tbody=document.getElementById('reg-tbody');if(!tbody)return;
   if(!registrations.length){tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:#9CA3AF;padding:2rem">尚無報名記錄</td></tr>';return}
@@ -1501,7 +1538,7 @@ function clearShort(){
   calcShortFee();
 }
 
-function deleteShort(id){if(!confirm('確定刪除？'))return;shortRegs=shortRegs.filter(r=>r.id!==id);sv('v3_shortRegs',shortRegs);saveToSheets('shortRegs');renderShortTable();renderSchedule();renderStudents()}
+function deleteShort(id){if(!confirm('確定刪除？'))return;markDeleted('shortRegs',id);shortRegs=shortRegs.filter(r=>r.id!==id);sv('v3_shortRegs',shortRegs);saveToSheets('shortRegs');renderShortTable();renderSchedule();renderStudents()}
 function renderShortTable(){
   const tbody=document.getElementById('short-tbody');if(!tbody)return;
   if(!shortRegs.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:#9CA3AF;padding:2rem">尚無短桿果嶺報名記錄</td></tr>';return}
@@ -1545,7 +1582,7 @@ function closeModal(){document.getElementById('reschedule-modal').classList.remo
 
 // ===== STUDENTS =====
 function addStudent(){const name=document.getElementById('stu-name').value.trim(),plan=document.getElementById('stu-plan').value,total=parseInt(document.getElementById('stu-total').value)||1;if(!name)return;students.push({id:Date.now(),name,plan,totalSessions:total,source:'manual'});sv('v3_students',students);saveToSheets('students');document.getElementById('stu-name').value='';document.getElementById('stu-total').value='1';renderStudents()}
-function deleteStudent(id){students=students.filter(s=>s.id!==id);sv('v3_students',students);saveToSheets('students');renderStudents()}
+function deleteStudent(id){markDeleted('students',id);students=students.filter(s=>s.id!==id);sv('v3_students',students);saveToSheets('students');renderStudents()}
 function renderStudents(){
   const search=(document.getElementById('stu-search')||{value:''}).value.toLowerCase()||'',planF=(document.getElementById('stu-filter-plan')||{}).value||'';
   let list=students;if(search)list=list.filter(s=>s.name.toLowerCase().includes(search));if(planF)list=list.filter(s=>s.plan===planF);
