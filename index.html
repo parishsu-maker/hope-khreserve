@@ -62,7 +62,7 @@ body{font-family:'Noto Sans TC',sans-serif;background:#F2F2F0;color:#1A1A1A;min-
 .card{background:#fff;border:1px solid #E8E8E8;border-radius:12px;padding:1.25rem;margin-bottom:1rem}
 .card-title{font-size:15px;font-weight:600;margin-bottom:1rem;color:#1A1A1A;display:flex;align-items:center;gap:8px}
 .form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:10px}
-.fg{display:flex;flex-direction:column;gap:4px}
+.fg{display:flex;flex-direction:column;gap:4px;min-width:0}
 .fg label{font-size:12px;color:#888;font-weight:500}
 .req::after{content:" *";color:#DC2626;font-weight:700}
 .fg input,.fg select{width:100%;padding:8px 10px;border:1px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:'Noto Sans TC',sans-serif;color:#1A1A1A;background:#fff;transition:border .12s;outline:none}
@@ -129,12 +129,13 @@ tr:hover td{background:#FAFAFA}
 .day-date-info strong{font-size:15px;font-weight:600;color:#1A1A1A;display:block}
 .day-date-info.closed-lbl strong{color:#DC2626}
 .day-body{padding:10px 14px;background:#fff}
-.coach-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #F0F0F0;background:#fff}
+.coach-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #F0F0F0;background:#fff}
 .coach-row:last-child{border-bottom:none}
 .coach-row.reschedule-row{background:#FFF7ED}
-.coach-info{display:flex;align-items:center;min-width:90px}
-.coach-status{display:flex;align-items:center;gap:8px;flex:1}
-.coach-students{font-size:12px;color:#4B5563;flex:1}
+.coach-info{display:flex;align-items:center;min-width:64px;flex:0 0 auto}
+.coach-status{display:flex;align-items:center;gap:6px;flex:0 0 auto}
+.coach-students{font-size:12px;color:#4B5563;flex:1;min-width:0}
+.coach-students .stu-line{display:block;line-height:1.5}
 
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:none;align-items:center;justify-content:center;z-index:500}
 .modal-overlay.show{display:flex}
@@ -175,6 +176,7 @@ tr:hover td{background:#FAFAFA}
 .mode-btn.active{background:#1A1A1A;color:#fff;border-color:#1A1A1A}
 .export-card{background:#F7F7F7;border-radius:8px;padding:1rem;margin-bottom:1rem}
 .filter-bar{display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;align-items:flex-end}
+.filter-bar .fg{flex:1 1 140px;min-width:0}
 
 /* 時段自填欄位動畫 */
 .time-other-wrap{display:none;flex-direction:column;gap:4px}
@@ -343,7 +345,7 @@ tr:hover td{background:#FAFAFA}
         <div class="card-title">報名記錄</div>
         <div class="filter-bar" style="margin-bottom:1rem">
           <div class="fg"><label>搜尋日期</label><input type="date" id="reg-search-date" onchange="renderRegTable()"></div>
-          <div class="fg"><label>搜尋學員姓名</label><input type="text" id="reg-search-name" placeholder="輸入姓名搜尋..." oninput="renderRegTable()" style="width:160px;padding:8px 10px;border:1px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:'Noto Sans TC',sans-serif"></div>
+          <div class="fg"><label>搜尋學員姓名</label><input type="text" id="reg-search-name" placeholder="輸入姓名搜尋..." oninput="renderRegTable()"></div>
           <button class="btn btn-sm" onclick="clearRegSearch()">清除篩選</button>
         </div>
         <div id="reg-period-note" style="font-size:12px;color:#9CA3AF;margin-bottom:10px"></div>
@@ -441,7 +443,7 @@ tr:hover td{background:#FAFAFA}
         <div class="card-title">短桿果嶺報名記錄</div>
         <div class="filter-bar" style="margin-bottom:1rem">
           <div class="fg"><label>搜尋日期</label><input type="date" id="short-search-date" onchange="renderShortTable()"></div>
-          <div class="fg"><label>搜尋學員姓名</label><input type="text" id="short-search-name" placeholder="輸入姓名搜尋..." oninput="renderShortTable()" style="width:160px;padding:8px 10px;border:1px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:'Noto Sans TC',sans-serif"></div>
+          <div class="fg"><label>搜尋學員姓名</label><input type="text" id="short-search-name" placeholder="輸入姓名搜尋..." oninput="renderShortTable()"></div>
           <button class="btn btn-sm" onclick="clearShortSearch()">清除篩選</button>
         </div>
         <div id="short-period-note" style="font-size:12px;color:#9CA3AF;margin-bottom:10px"></div>
@@ -608,7 +610,7 @@ tr:hover td{background:#FAFAFA}
 <script>
 // ===== GOOGLE SHEETS API CONFIG =====
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwz47KEU8iWvcIHA-aiNltQBFEk1uXGV_RJXtMRC9ku4FFGBzMZQekl7mwN8Bj-UTtISA/exec';
-const APP_VERSION = 'v2026-06-25-f'; // 後端改為合併式寫入，避免多裝置同時儲存互相洗掉資料
+const APP_VERSION = 'v2026-06-25-h'; // 課表：縮小教練/人數區塊，學員名單改逐行顯示
 (function(){ const v=document.getElementById('app-version'); if(v) v.textContent=APP_VERSION; })();
 let isOnline = false;
 let syncStatus = 'init';
@@ -1348,7 +1350,7 @@ function renderSchedule(){
         const rs=registrations.filter(r=>r.date===date&&r.coach===coach);
         const total=rs.reduce((s,r)=>s+r.count,0);
         const slots=[1,2,3,4].map(i=>`<span class="slot-dot ${i<=total?'dot-filled':'dot-empty'}"></span>`).join('');
-        const names=rs.map(r=>r.studentName+(r.count>1?'×'+r.count:'')+(r.level?'<span style="color:#9CA3AF">（'+r.level+'）</span>':'')).join('、');
+        const names=rs.map(r=>`<span class="stu-line">${r.studentName}${r.count>1?'×'+r.count:''}${r.level?'<span style="color:#9CA3AF">（'+r.level+'）</span>':''}</span>`).join('');
         let tag='';
         if(total>=4)tag='<span class="tag tag-red">額滿</span>';
         else if(isSoloClass(date,coach))tag='<span class="tag tag-reschedule"><i class="ti ti-lock"></i> 一人開班</span>';
