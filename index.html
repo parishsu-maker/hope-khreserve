@@ -233,7 +233,7 @@ tr:hover td{background:#FAFAFA}
       <span style="display:inline-block;animation:spin 1s linear infinite;margin-right:6px">⟳</span>連線中，請稍候…
     </div>
     <style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>
-    <div class="login-hint">元木運動內部系統 · 僅限授權人員使用</div>
+    <div class="login-hint">元木運動內部系統 · 僅限授權人員使用<br><span id="app-version" style="opacity:.6"></span></div>
   </div>
 </div>
 
@@ -608,6 +608,8 @@ tr:hover td{background:#FAFAFA}
 <script>
 // ===== GOOGLE SHEETS API CONFIG =====
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwz47KEU8iWvcIHA-aiNltQBFEk1uXGV_RJXtMRC9ku4FFGBzMZQekl7mwN8Bj-UTtISA/exec';
+const APP_VERSION = 'v2026-06-25-d'; // 修正：無資料時帳期提示文字不會消失
+(function(){ const v=document.getElementById('app-version'); if(v) v.textContent=APP_VERSION; })();
 let isOnline = false;
 let syncStatus = 'init';
 
@@ -1459,18 +1461,10 @@ function clearReg(){
 function deleteReg(id){if(!confirm('確定刪除此筆報名？'))return;markDeleted('regs',id);registrations=registrations.filter(r=>r.id!==id);sv('v3_regs',registrations);saveToSheets('regs');renderRegTable();renderSchedule();renderStudents()}
 function renderRegTable(){
   const tbody=document.getElementById('reg-tbody');if(!tbody)return;
-  if(!registrations.length){tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:#9CA3AF;padding:2rem">尚無報名記錄</td></tr>';return}
   const fd=(document.getElementById('reg-search-date')||{}).value||'';
   const fn=((document.getElementById('reg-search-name')||{}).value||'').trim().toLowerCase();
   const searching=!!(fd||fn);
-  let list=[...registrations];
   const {start,end}=getBillingPeriod();
-  if(searching){
-    if(fd) list=list.filter(r=>r.date===fd);
-    if(fn) list=list.filter(r=>(r.studentName||'').toLowerCase().includes(fn));
-  }else{
-    list=list.filter(r=>r.date>=start&&r.date<=end);
-  }
   const note=document.getElementById('reg-period-note');
   if(note){
     if(searching){
@@ -1480,6 +1474,14 @@ function renderRegTable(){
       note.style.color='#DC2626';
       note.textContent='以下報名日期區間 '+toMD(start)+'-'+toMD(end);
     }
+  }
+  if(!registrations.length){tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:#9CA3AF;padding:2rem">尚無報名記錄</td></tr>';return}
+  let list=[...registrations];
+  if(searching){
+    if(fd) list=list.filter(r=>r.date===fd);
+    if(fn) list=list.filter(r=>(r.studentName||'').toLowerCase().includes(fn));
+  }else{
+    list=list.filter(r=>r.date>=start&&r.date<=end);
   }
   if(!list.length){tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:#9CA3AF;padding:2rem">'+(searching?'查無符合條件的報名記錄':'此帳期內尚無報名記錄，可用上方搜尋查詢其他日期')+'</td></tr>';return}
   tbody.innerHTML=list.sort((a,b)=>a.id-b.id).map(r=>{
@@ -1624,18 +1626,10 @@ function clearShort(){
 function deleteShort(id){if(!confirm('確定刪除？'))return;markDeleted('shortRegs',id);shortRegs=shortRegs.filter(r=>r.id!==id);sv('v3_shortRegs',shortRegs);saveToSheets('shortRegs');renderShortTable();renderSchedule();renderStudents()}
 function renderShortTable(){
   const tbody=document.getElementById('short-tbody');if(!tbody)return;
-  if(!shortRegs.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:#9CA3AF;padding:2rem">尚無短桿果嶺報名記錄</td></tr>';return}
   const fd=(document.getElementById('short-search-date')||{}).value||'';
   const fn=((document.getElementById('short-search-name')||{}).value||'').trim().toLowerCase();
   const searching=!!(fd||fn);
-  let list=[...shortRegs];
   const {start,end}=getBillingPeriod();
-  if(searching){
-    if(fd) list=list.filter(r=>r.date===fd);
-    if(fn) list=list.filter(r=>(r.studentName||'').toLowerCase().includes(fn));
-  }else{
-    list=list.filter(r=>r.date>=start&&r.date<=end);
-  }
   const note=document.getElementById('short-period-note');
   if(note){
     if(searching){
@@ -1645,6 +1639,14 @@ function renderShortTable(){
       note.style.color='#DC2626';
       note.textContent='以下報名日期區間 '+toMD(start)+'-'+toMD(end);
     }
+  }
+  if(!shortRegs.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:#9CA3AF;padding:2rem">尚無短桿果嶺報名記錄</td></tr>';return}
+  let list=[...shortRegs];
+  if(searching){
+    if(fd) list=list.filter(r=>r.date===fd);
+    if(fn) list=list.filter(r=>(r.studentName||'').toLowerCase().includes(fn));
+  }else{
+    list=list.filter(r=>r.date>=start&&r.date<=end);
   }
   if(!list.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:#9CA3AF;padding:2rem">'+(searching?'查無符合條件的報名記錄':'此帳期內尚無短桿果嶺報名記錄，可用上方搜尋查詢其他日期')+'</td></tr>';return}
   tbody.innerHTML=list.sort((a,b)=>a.id-b.id).map(r=>`<tr>
