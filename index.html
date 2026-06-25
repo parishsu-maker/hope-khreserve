@@ -277,7 +277,7 @@ tr:hover td{background:#FAFAFA}
     <div id="page-register" class="page">
       <div class="card">
         <div class="card-title">下場班報名登記</div>
-        <div class="admin-notice" id="reg-admin-notice" style="display:none"><i class="ti ti-info-circle"></i>補登過去日期的資料，請聯絡行政由後台操作</div>
+        <div class="admin-notice" id="reg-admin-notice" style="display:none"><i class="ti ti-info-circle"></i>補登與修改資料，請聯絡行政後台操作</div>
         <div id="reg-alert" class="alert"></div>
         <div style="margin-bottom:14px">
           <div style="font-size:12px;color:#888;margin-bottom:6px"><span class="step-badge">1</span>教練登記</div>
@@ -360,7 +360,7 @@ tr:hover td{background:#FAFAFA}
         <div class="card-title"><i class="ti ti-flag"></i> 短桿果嶺使用報名登記</div>
         <div style="background:#F0FDF4;border:1px solid #A7F3D0;border-radius:8px;padding:10px 14px;font-size:13px;color:#065F46;margin-bottom:1rem;display:flex;align-items:center;gap:8px">
           <i class="ti ti-info-circle"></i>所有教練均可選，時段由教練自行填寫。<strong>報名即視為使用完畢。</strong></div>
-        <div class="admin-notice" id="short-admin-notice" style="display:none"><i class="ti ti-info-circle"></i>補登過去日期的資料，請聯絡行政由後台操作</div>
+        <div class="admin-notice" id="short-admin-notice" style="display:none"><i class="ti ti-info-circle"></i>補登與修改資料，請聯絡行政後台操作</div>
         <div id="short-alert" class="alert"></div>
         <div style="margin-bottom:14px">
           <div style="font-size:12px;color:#888;margin-bottom:6px"><span class="step-badge">1</span>教練與時間</div>
@@ -610,7 +610,7 @@ tr:hover td{background:#FAFAFA}
 <script>
 // ===== GOOGLE SHEETS API CONFIG =====
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwz47KEU8iWvcIHA-aiNltQBFEk1uXGV_RJXtMRC9ku4FFGBzMZQekl7mwN8Bj-UTtISA/exec';
-const APP_VERSION = 'v2026-06-25-h'; // 課表：縮小教練/人數區塊，學員名單改逐行顯示
+const APP_VERSION = 'v2026-06-25-i'; // 補登提示文字調整
 (function(){ const v=document.getElementById('app-version'); if(v) v.textContent=APP_VERSION; })();
 let isOnline = false;
 let syncStatus = 'init';
