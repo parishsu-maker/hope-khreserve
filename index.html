@@ -341,6 +341,11 @@ tr:hover td{background:#FAFAFA}
       </div>
       <div class="card">
         <div class="card-title">報名記錄</div>
+        <div class="filter-bar" style="margin-bottom:1rem">
+          <div class="fg"><label>搜尋日期</label><input type="date" id="reg-search-date" onchange="renderRegTable()"></div>
+          <div class="fg"><label>搜尋學員姓名</label><input type="text" id="reg-search-name" placeholder="輸入姓名搜尋..." oninput="renderRegTable()" style="width:160px;padding:8px 10px;border:1px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:'Noto Sans TC',sans-serif"></div>
+          <button class="btn btn-sm" onclick="clearRegSearch()">清除篩選</button>
+        </div>
         <div class="ovx"><table><thead><tr><th>下場日期 / 登記時間</th><th>登記教練</th><th>學員</th><th>人數</th><th>指定教練</th><th>系統已購課訂單</th><th>課堂數</th><th>教練上課時數</th><th>備註</th><th></th></tr></thead>
         <tbody id="reg-tbody"></tbody></table></div>
       </div>
@@ -433,6 +438,11 @@ tr:hover td{background:#FAFAFA}
       </div>
       <div class="card">
         <div class="card-title">短桿果嶺報名記錄</div>
+        <div class="filter-bar" style="margin-bottom:1rem">
+          <div class="fg"><label>搜尋日期</label><input type="date" id="short-search-date" onchange="renderShortTable()"></div>
+          <div class="fg"><label>搜尋學員姓名</label><input type="text" id="short-search-name" placeholder="輸入姓名搜尋..." oninput="renderShortTable()" style="width:160px;padding:8px 10px;border:1px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:'Noto Sans TC',sans-serif"></div>
+          <button class="btn btn-sm" onclick="clearShortSearch()">清除篩選</button>
+        </div>
         <div class="ovx"><table><thead><tr><th>日期 / 登記時間</th><th>時段</th><th>登記教練</th><th>指定教練</th><th>學員</th><th>人數</th><th>費用</th><th>備註</th><th></th></tr></thead>
         <tbody id="short-tbody"></tbody></table></div>
       </div>
@@ -548,7 +558,7 @@ tr:hover td{background:#FAFAFA}
     <div id="page-settings" class="page">
       <div class="card"><div class="card-title">教練名單</div><div id="coach-list-ui"></div><hr class="divider"><div class="ilfx"><input type="text" id="new-coach" placeholder="新增教練姓名" style="width:180px;padding:8px 10px;border:1px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:'Noto Sans TC',sans-serif"><button class="btn btn-primary btn-sm" onclick="addCoach()">新增</button></div></div>
       <div class="card"><div class="card-title">系統已購課訂單設定（下場班）</div><p style="font-size:12px;color:#888;margin-bottom:4px"><i class="ti ti-lock"></i> 修改後僅影響新報名，舊記錄金額不變；改名稱會同步更新舊報名的訂單名</p><div id="settings-fee-note" style="font-size:12px;margin-bottom:8px;min-height:16px"></div><div id="fee-types-ui"></div><hr class="divider"><div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap"><div class="fg" style="flex:2;min-width:160px"><label>訂單名稱</label><input type="text" id="new-fee-name" placeholder="例：個人套組第三堂"></div><div class="fg" style="flex:1;min-width:100px"><label>金額 (NT$)</label><input type="number" id="new-fee-amt" placeholder="例：3000" min="0"></div><button class="btn btn-primary btn-sm" onclick="addFeeType()" style="align-self:flex-end;height:36px">新增</button></div></div>
-      <div class="card"><div class="card-title">費率設定</div><p style="font-size:12px;color:#888;margin-bottom:1rem"><i class="ti ti-lock"></i> 修改後僅影響新報名，舊記錄金額不變</p><div class="si"><span style="font-size:13px">國華球場費用（每人）</span><div class="ilfx"><span style="font-size:12px;color:#888">NT$/人</span><input type="number" id="kh-rate" style="width:90px;text-align:right;padding:6px 8px;border:1px solid #E0E0E0;border-radius:6px;font-family:'Noto Sans TC',sans-serif" onchange="saveKhRate(this.value)"></div></div><div class="si"><span style="font-size:13px">短桿果嶺費用（每人固定）</span><div class="ilfx"><span style="font-size:12px;color:#888">NT$/人</span><input type="number" id="short-rate" style="width:90px;text-align:right;padding:6px 8px;border:1px solid #E0E0E0;border-radius:6px;font-family:'Noto Sans TC',sans-serif" onchange="saveShortRate(this.value)"></div></div><div class="si"><span style="font-size:13px">短桿果嶺費用（每小時）</span><div class="ilfx"><span style="font-size:12px;color:#888">NT$/小時/人</span><input type="number" id="short-hourly-rate" style="width:90px;text-align:right;padding:6px 8px;border:1px solid #E0E0E0;border-radius:6px;font-family:'Noto Sans TC',sans-serif" onchange="saveShortHourlyRate(this.value)"></div></div></div>
+      <div class="card"><div class="card-title">費率設定</div><p style="font-size:12px;color:#888;margin-bottom:1rem"><i class="ti ti-lock"></i> 修改後僅影響新報名，舊記錄金額不變</p><div class="si"><span style="font-size:13px">國華球場費用（每人）</span><div class="ilfx"><span style="font-size:12px;color:#888">NT$/人</span><input type="number" id="kh-rate" style="width:90px;text-align:right;padding:6px 8px;border:1px solid #E0E0E0;border-radius:6px;font-family:'Noto Sans TC',sans-serif" onchange="saveKhRate(this.value)"></div></div><div class="si"><span style="font-size:13px">短桿果嶺費用（每人固定）</span><div class="ilfx"><span style="font-size:12px;color:#888">NT$/人</span><input type="number" id="short-rate" style="width:90px;text-align:right;padding:6px 8px;border:1px solid #E0E0E0;border-radius:6px;font-family:'Noto Sans TC',sans-serif" onchange="saveShortRate(this.value)"></div></div><div class="si"><span style="font-size:13px">短桿果嶺費用（每小時）<span style="font-size:11px;color:#9CA3AF;font-weight:400">（2026.7.1 開始）</span></span><div class="ilfx"><span style="font-size:12px;color:#888">NT$/小時/人</span><input type="number" id="short-hourly-rate" style="width:90px;text-align:right;padding:6px 8px;border:1px solid #E0E0E0;border-radius:6px;font-family:'Noto Sans TC',sans-serif" onchange="saveShortHourlyRate(this.value)"></div></div></div>
       <div class="card"><div class="card-title">教練抽成費率（下場班）</div><p style="font-size:13px;color:#888;margin-bottom:4px">依學員人頭計費；若該時段設為「一人開班」，則保障雙倍費率（視為滿班）</p><p style="font-size:12px;color:#888;margin-bottom:1rem"><i class="ti ti-lock"></i> 修改後僅影響新報名，舊記錄金額不變</p><div id="coach-fee-ui"></div><hr class="divider"><div id="recalc-fee-note" style="font-size:12px;margin-bottom:8px;min-height:16px"></div><button class="btn btn-warning btn-sm" onclick="recalcAllCoachFees()"><i class="ti ti-refresh"></i> 重新計算所有歷史教練費</button><p style="font-size:11px;color:#9CA3AF;margin-top:6px">用於修正過去因計算錯誤產生的教練費；會依目前的人頭計價規則（一人開班才雙倍）重新套用到所有已存在的下場班報名記錄</p></div>
     </div>
 
@@ -1429,7 +1439,13 @@ function deleteReg(id){if(!confirm('確定刪除此筆報名？'))return;markDel
 function renderRegTable(){
   const tbody=document.getElementById('reg-tbody');if(!tbody)return;
   if(!registrations.length){tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:#9CA3AF;padding:2rem">尚無報名記錄</td></tr>';return}
-  tbody.innerHTML=[...registrations].sort((a,b)=>a.id-b.id).map(r=>{
+  const fd=(document.getElementById('reg-search-date')||{}).value||'';
+  const fn=((document.getElementById('reg-search-name')||{}).value||'').trim().toLowerCase();
+  let list=[...registrations];
+  if(fd) list=list.filter(r=>r.date===fd);
+  if(fn) list=list.filter(r=>(r.studentName||'').toLowerCase().includes(fn));
+  if(!list.length){tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:#9CA3AF;padding:2rem">查無符合條件的報名記錄</td></tr>';return}
+  tbody.innerHTML=list.sort((a,b)=>a.id-b.id).map(r=>{
     const hasLog=r.rescheduleLog&&r.rescheduleLog.length>0,lastLog=hasLog?r.rescheduleLog[r.rescheduleLog.length-1]:null;
     const noteCell=hasLog?`<span class="tag tag-amber" style="font-size:10px;margin-right:4px">改期</span><span style="font-size:12px;color:#9CA3AF">原 ${lastLog.from}${lastLog.reason&&lastLog.reason!=='未填寫'?' — '+lastLog.reason:''}</span>`:`<span style="font-size:12px;color:#9CA3AF">${r.note||'—'}</span>`;
     const soloTag=r.soloClass?'<span class="tag tag-reschedule" style="font-size:10px;margin-left:4px"><i class="ti ti-lock"></i> 一人開班</span>':'';
@@ -1443,6 +1459,11 @@ function renderRegTable(){
       <td>${noteCell}</td>
       <td><div style="display:flex;gap:4px"><button class="btn btn-info btn-sm" onclick="openReschedule(${r.id})">改期</button><button class="btn btn-danger btn-sm" onclick="deleteReg(${r.id})">刪除</button></div></td></tr>`;
   }).join('');
+}
+function clearRegSearch(){
+  const d=document.getElementById('reg-search-date'),n=document.getElementById('reg-search-name');
+  if(d)d.value='';if(n)n.value='';
+  renderRegTable();
 }
 
 // ===== SHORT =====
@@ -1567,7 +1588,13 @@ function deleteShort(id){if(!confirm('確定刪除？'))return;markDeleted('shor
 function renderShortTable(){
   const tbody=document.getElementById('short-tbody');if(!tbody)return;
   if(!shortRegs.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:#9CA3AF;padding:2rem">尚無短桿果嶺報名記錄</td></tr>';return}
-  tbody.innerHTML=[...shortRegs].sort((a,b)=>a.id-b.id).map(r=>`<tr>
+  const fd=(document.getElementById('short-search-date')||{}).value||'';
+  const fn=((document.getElementById('short-search-name')||{}).value||'').trim().toLowerCase();
+  let list=[...shortRegs];
+  if(fd) list=list.filter(r=>r.date===fd);
+  if(fn) list=list.filter(r=>(r.studentName||'').toLowerCase().includes(fn));
+  if(!list.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:#9CA3AF;padding:2rem">查無符合條件的報名記錄</td></tr>';return}
+  tbody.innerHTML=list.sort((a,b)=>a.id-b.id).map(r=>`<tr>
     <td><span style="font-weight:600">${r.date}</span><span class="time-sub">登記 ${fmtTime(r.createdAt||r.id)}</span></td>
     <td>${r.time}</td>
     <td>${r.selfCoach||'—'}</td>
@@ -1576,6 +1603,11 @@ function renderShortTable(){
     <td style="font-weight:600">NT$ ${r.amount.toLocaleString()}${r.priceMode==='hourly'?'<span class="time-sub">'+r.hours+'小時/人</span>':''}</td>
     <td style="color:#9CA3AF">${r.note||'—'}</td>
     <td><button class="btn btn-danger btn-sm" onclick="deleteShort(${r.id})">刪除</button></td></tr>`).join('');
+}
+function clearShortSearch(){
+  const d=document.getElementById('short-search-date'),n=document.getElementById('short-search-name');
+  if(d)d.value='';if(n)n.value='';
+  renderShortTable();
 }
 
 // ===== RESCHEDULE =====
