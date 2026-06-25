@@ -346,6 +346,7 @@ tr:hover td{background:#FAFAFA}
           <div class="fg"><label>搜尋學員姓名</label><input type="text" id="reg-search-name" placeholder="輸入姓名搜尋..." oninput="renderRegTable()" style="width:160px;padding:8px 10px;border:1px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:'Noto Sans TC',sans-serif"></div>
           <button class="btn btn-sm" onclick="clearRegSearch()">清除篩選</button>
         </div>
+        <div id="reg-period-note" style="font-size:12px;color:#9CA3AF;margin-bottom:10px"></div>
         <div class="ovx"><table><thead><tr><th>下場日期 / 登記時間</th><th>登記教練</th><th>學員</th><th>人數</th><th>指定教練</th><th>系統已購課訂單</th><th>課堂數</th><th>教練上課時數</th><th>備註</th><th></th></tr></thead>
         <tbody id="reg-tbody"></tbody></table></div>
       </div>
@@ -443,6 +444,7 @@ tr:hover td{background:#FAFAFA}
           <div class="fg"><label>搜尋學員姓名</label><input type="text" id="short-search-name" placeholder="輸入姓名搜尋..." oninput="renderShortTable()" style="width:160px;padding:8px 10px;border:1px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:'Noto Sans TC',sans-serif"></div>
           <button class="btn btn-sm" onclick="clearShortSearch()">清除篩選</button>
         </div>
+        <div id="short-period-note" style="font-size:12px;color:#9CA3AF;margin-bottom:10px"></div>
         <div class="ovx"><table><thead><tr><th>日期 / 登記時間</th><th>時段</th><th>登記教練</th><th>指定教練</th><th>學員</th><th>人數</th><th>費用</th><th>備註</th><th></th></tr></thead>
         <tbody id="short-tbody"></tbody></table></div>
       </div>
@@ -1249,6 +1251,25 @@ function todayISO(){
   const d=new Date();
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
+// YYYY-MM-DD -> M/D（不補零），用於帳期顯示
+function toMD(dateStr){
+  const p=String(dateStr).split('-');
+  return parseInt(p[1],10)+'/'+parseInt(p[2],10);
+}
+// 公司結帳帳期：每月21日到下月20日。回傳「今天」所屬帳期的起訖日期(YYYY-MM-DD)
+function getBillingPeriod(){
+  const d=new Date();
+  const day=d.getDate();
+  let start,end;
+  if(day>=21){
+    start=new Date(d.getFullYear(),d.getMonth(),21);
+    end=new Date(d.getFullYear(),d.getMonth()+1,20);
+  }else{
+    start=new Date(d.getFullYear(),d.getMonth()-1,21);
+    end=new Date(d.getFullYear(),d.getMonth(),20);
+  }
+  return {start:toISO(start),end:toISO(end)};
+}
 function isClosed(d){return!!closedDates[d]}
 function isPast(date){return date<todayISO()}
 function getCoachFee(c){return coachFees[c]!==undefined?coachFees[c]:DEF_COACH_FEE}
@@ -1441,10 +1462,26 @@ function renderRegTable(){
   if(!registrations.length){tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:#9CA3AF;padding:2rem">尚無報名記錄</td></tr>';return}
   const fd=(document.getElementById('reg-search-date')||{}).value||'';
   const fn=((document.getElementById('reg-search-name')||{}).value||'').trim().toLowerCase();
+  const searching=!!(fd||fn);
   let list=[...registrations];
-  if(fd) list=list.filter(r=>r.date===fd);
-  if(fn) list=list.filter(r=>(r.studentName||'').toLowerCase().includes(fn));
-  if(!list.length){tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:#9CA3AF;padding:2rem">查無符合條件的報名記錄</td></tr>';return}
+  const {start,end}=getBillingPeriod();
+  if(searching){
+    if(fd) list=list.filter(r=>r.date===fd);
+    if(fn) list=list.filter(r=>(r.studentName||'').toLowerCase().includes(fn));
+  }else{
+    list=list.filter(r=>r.date>=start&&r.date<=end);
+  }
+  const note=document.getElementById('reg-period-note');
+  if(note){
+    if(searching){
+      note.style.color='#9CA3AF';
+      note.textContent='搜尋結果（不限帳期，顯示所有符合條件的記錄）';
+    }else{
+      note.style.color='#DC2626';
+      note.textContent='以下報名日期區間 '+toMD(start)+'-'+toMD(end);
+    }
+  }
+  if(!list.length){tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:#9CA3AF;padding:2rem">'+(searching?'查無符合條件的報名記錄':'此帳期內尚無報名記錄，可用上方搜尋查詢其他日期')+'</td></tr>';return}
   tbody.innerHTML=list.sort((a,b)=>a.id-b.id).map(r=>{
     const hasLog=r.rescheduleLog&&r.rescheduleLog.length>0,lastLog=hasLog?r.rescheduleLog[r.rescheduleLog.length-1]:null;
     const noteCell=hasLog?`<span class="tag tag-amber" style="font-size:10px;margin-right:4px">改期</span><span style="font-size:12px;color:#9CA3AF">原 ${lastLog.from}${lastLog.reason&&lastLog.reason!=='未填寫'?' — '+lastLog.reason:''}</span>`:`<span style="font-size:12px;color:#9CA3AF">${r.note||'—'}</span>`;
@@ -1590,10 +1627,26 @@ function renderShortTable(){
   if(!shortRegs.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:#9CA3AF;padding:2rem">尚無短桿果嶺報名記錄</td></tr>';return}
   const fd=(document.getElementById('short-search-date')||{}).value||'';
   const fn=((document.getElementById('short-search-name')||{}).value||'').trim().toLowerCase();
+  const searching=!!(fd||fn);
   let list=[...shortRegs];
-  if(fd) list=list.filter(r=>r.date===fd);
-  if(fn) list=list.filter(r=>(r.studentName||'').toLowerCase().includes(fn));
-  if(!list.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:#9CA3AF;padding:2rem">查無符合條件的報名記錄</td></tr>';return}
+  const {start,end}=getBillingPeriod();
+  if(searching){
+    if(fd) list=list.filter(r=>r.date===fd);
+    if(fn) list=list.filter(r=>(r.studentName||'').toLowerCase().includes(fn));
+  }else{
+    list=list.filter(r=>r.date>=start&&r.date<=end);
+  }
+  const note=document.getElementById('short-period-note');
+  if(note){
+    if(searching){
+      note.style.color='#9CA3AF';
+      note.textContent='搜尋結果（不限帳期，顯示所有符合條件的記錄）';
+    }else{
+      note.style.color='#DC2626';
+      note.textContent='以下報名日期區間 '+toMD(start)+'-'+toMD(end);
+    }
+  }
+  if(!list.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:#9CA3AF;padding:2rem">'+(searching?'查無符合條件的報名記錄':'此帳期內尚無短桿果嶺報名記錄，可用上方搜尋查詢其他日期')+'</td></tr>';return}
   tbody.innerHTML=list.sort((a,b)=>a.id-b.id).map(r=>`<tr>
     <td><span style="font-weight:600">${r.date}</span><span class="time-sub">登記 ${fmtTime(r.createdAt||r.id)}</span></td>
     <td>${r.time}</td>
