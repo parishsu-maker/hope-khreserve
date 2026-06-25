@@ -608,7 +608,7 @@ tr:hover td{background:#FAFAFA}
 <script>
 // ===== GOOGLE SHEETS API CONFIG =====
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwz47KEU8iWvcIHA-aiNltQBFEk1uXGV_RJXtMRC9ku4FFGBzMZQekl7mwN8Bj-UTtISA/exec';
-const APP_VERSION = 'v2026-06-25-d'; // 修正：無資料時帳期提示文字不會消失
+const APP_VERSION = 'v2026-06-25-f'; // 後端改為合併式寫入，避免多裝置同時儲存互相洗掉資料
 (function(){ const v=document.getElementById('app-version'); if(v) v.textContent=APP_VERSION; })();
 let isOnline = false;
 let syncStatus = 'init';
@@ -794,9 +794,9 @@ async function _flushSave(type) {
   delete _pendingSave[type];
   setSyncStatus('saving');
   let payload;
-  if (type === 'regs')      payload = { action: 'saveRegs',      data: JSON.stringify(registrations) };
-  if (type === 'shortRegs') payload = { action: 'saveShortRegs', data: JSON.stringify(shortRegs) };
-  if (type === 'students')  payload = { action: 'saveStudents',  data: JSON.stringify(students) };
+  if (type === 'regs')      payload = { action: 'saveRegs',      data: JSON.stringify(registrations), deletedIds: JSON.stringify([..._deletedIds.regs]) };
+  if (type === 'shortRegs') payload = { action: 'saveShortRegs', data: JSON.stringify(shortRegs), deletedIds: JSON.stringify([..._deletedIds.shortRegs]) };
+  if (type === 'students')  payload = { action: 'saveStudents',  data: JSON.stringify(students), deletedIds: JSON.stringify([..._deletedIds.students]) };
   if (type === 'rosters')   payload = { action: 'saveRosters',   data: JSON.stringify(rosters) };
   if (type === 'closed')    payload = { action: 'saveClosed',    data: JSON.stringify(closedDates) };
   if (type === 'settings')  payload = { action: 'saveSettings',  data: JSON.stringify({
@@ -1157,15 +1157,19 @@ function _doLoginContinue(){
   }
 }
 
-// ===== 自動同步：每 20 秒背景拉一次 Sheets 最新資料 =====
+// ===== 自動同步：每 8 秒背景拉一次 Sheets 最新資料 =====
 let _autoSyncTimer=null;
+let _autoSyncInFlight=false; // 避免上一次還沒回來就疊加下一次請求
 function startAutoSync(){
   if(_autoSyncTimer) clearInterval(_autoSyncTimer);
   _autoSyncTimer=setInterval(function(){
     // 分頁在背景時不同步，省流量；切回前景會立刻同步（見 visibilitychange）
     if(document.hidden) return;
     if(!GAS_URL||!isOnline) return;
+    if(_autoSyncInFlight) return; // 上一次還在進行中，跳過這次排程
+    _autoSyncInFlight=true;
     loadFromSheets().then(function(ok){
+      _autoSyncInFlight=false;
       if(!ok) return;
       // 只重繪當前頁面，不打斷使用者正在填寫的表單
       var activePage=document.querySelector('.page.active');
@@ -1176,9 +1180,10 @@ function startAutoSync(){
       else if(id==='students'){renderStudents();}
       else if(id==='roster'){renderRosterTable();renderClosedList();}
       else if(id==='finance'){renderFinance();}
-    });
-  }, 20000); // 20 秒
+    }).catch(function(){ _autoSyncInFlight=false; });
+  }, 8000); // 8 秒
 }
+
 
 // 切回分頁（從背景變前景）時立刻同步一次
 document.addEventListener('visibilitychange', function(){
