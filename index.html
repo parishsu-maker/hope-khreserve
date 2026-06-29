@@ -398,7 +398,7 @@ tr:hover td{background:#FAFAFA}
             <div class="fg" style="grid-column:span 2"><label class="req">學員姓名</label>
               <input type="text" id="short-stu-name" placeholder="輸入姓名..." oninput="onShortStuNameInput()" autocomplete="off" spellcheck="false"></div>
             <div class="fg"><label class="req">人數</label>
-              <select id="short-count" onchange="calcShortFee()"><option value="1">1人</option><option value="2">2人</option><option value="3">3人</option><option value="4">4人</option><option value="5">5人</option><option value="6">6人</option></select></div>
+              <select id="short-count" onchange="calcShortFee()"><option value="1">1人</option><option value="2">2人</option><option value="3">3人</option><option value="4">4人</option><option value="5">5人</option><option value="6">6人</option><option value="7">7人</option><option value="8">8人</option><option value="9">9人</option><option value="10">10人</option><option value="11">11人</option><option value="12">12人</option></select></div>
           </div>
           <div class="similar-box" id="short-similar-box">
             <div style="font-size:12px;font-weight:500;margin-bottom:6px;color:#666">找到相似學員，確認是否同一人：</div>
@@ -610,7 +610,7 @@ tr:hover td{background:#FAFAFA}
 <script>
 // ===== GOOGLE SHEETS API CONFIG =====
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwz47KEU8iWvcIHA-aiNltQBFEk1uXGV_RJXtMRC9ku4FFGBzMZQekl7mwN8Bj-UTtISA/exec';
-const APP_VERSION = 'v2026-06-25-i'; // 補登提示文字調整
+const APP_VERSION = 'v2026-06-25-j'; // 短桿果嶺人數上限改為12人
 (function(){ const v=document.getElementById('app-version'); if(v) v.textContent=APP_VERSION; })();
 let isOnline = false;
 let syncStatus = 'init';
