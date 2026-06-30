@@ -623,7 +623,7 @@ tr:hover td{background:#FAFAFA}
 <script>
 // ===== GOOGLE SHEETS API CONFIG =====
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwz47KEU8iWvcIHA-aiNltQBFEk1uXGV_RJXtMRC9ku4FFGBzMZQekl7mwN8Bj-UTtISA/exec';
-const APP_VERSION = 'v2026-06-29-d'; // 短桿果嶺刪除按鈕也限行政才顯示
+const APP_VERSION = 'v2026-06-29-e'; // 改期日期選單只顯示今天起的未來日期
 (function(){ const v=document.getElementById('app-version'); if(v) v.textContent=APP_VERSION; })();
 let isOnline = false;
 let syncStatus = 'init';
@@ -1691,7 +1691,7 @@ function openReschedule(id){
   document.getElementById('modal-reg-info').innerHTML=`<strong>${r.studentName}</strong> &nbsp;${r.date} &nbsp;<span class="avatar" style="display:inline-flex">${r.coach.slice(0,2)}</span> ${r.coach} &nbsp;人數：${r.count}`;
   document.getElementById('modal-alert').className='alert';document.getElementById('modal-reason').value='';
   const dateSel=document.getElementById('modal-new-date');dateSel.innerHTML='<option value="">— 選擇新日期 —</option>';
-  Object.keys(rosters).filter(d=>!isClosed(d)&&d!==r.date&&(rosters[d]||[]).length>0).sort().forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d+' ('+DOWS[new Date(d+'T00:00:00').getDay()]+')';dateSel.appendChild(o)});
+  Object.keys(rosters).filter(d=>!isClosed(d)&&d!==r.date&&(rosters[d]||[]).length>0&&d>=todayISO()).sort().forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d+' ('+DOWS[new Date(d+'T00:00:00').getDay()]+')';dateSel.appendChild(o)});
   document.getElementById('modal-new-coach').innerHTML='<option value="">— 請先選日期 —</option>';
   document.getElementById('reschedule-modal').classList.add('show');
 }
