@@ -352,6 +352,14 @@ tr:hover td{background:#FAFAFA}
         <div class="ovx"><table><thead><tr><th>下場日期 / 登記時間</th><th>登記教練</th><th>學員</th><th>人數</th><th>指定教練</th><th>系統已購課訂單</th><th>課堂數</th><th>教練上課時數</th><th>備註</th><th></th></tr></thead>
         <tbody id="reg-tbody"></tbody></table></div>
       </div>
+
+      <!-- 待改期清單 -->
+      <div class="card" id="pending-reschedule-card" style="border-color:#FDBA74;display:none">
+        <div class="card-title" style="color:#C2410C"><i class="ti ti-clock"></i> 待改期清單 <span id="pending-reschedule-count" class="tag tag-reschedule" style="margin-left:8px;font-size:12px"></span></div>
+        <p style="font-size:12px;color:#9CA3AF;margin-bottom:1rem">以下學員已付費但尚未確認新的上課日期，請盡快聯繫安排。</p>
+        <div class="ovx"><table><thead><tr><th>原下場日期</th><th>登記教練</th><th>學員</th><th>人數</th><th>指定教練</th><th>系統已購課訂單</th><th>標記時間</th><th>改期原因</th><th></th></tr></thead>
+        <tbody id="pending-reschedule-tbody"></tbody></table></div>
+      </div>
     </div>
 
     <!-- 短桿果嶺報名 -->
@@ -580,7 +588,12 @@ tr:hover td{background:#FAFAFA}
       <div class="fg"><label>新指定教練</label><select id="modal-new-coach"><option value="">— 請先選日期 —</option></select></div>
     </div>
     <div class="fg" style="margin-bottom:1rem"><label>改期原因</label><input type="text" id="modal-reason" placeholder="例：下雨取消、學員臨時有事..."></div>
-    <div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="confirmReschedule()">確認改期</button><button class="btn" onclick="closeModal()">取消</button></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="confirmReschedule()">確認改期</button>
+      <button class="btn btn-warning" onclick="markPendingReschedule()"><i class="ti ti-clock"></i> 已付費，待確認日期</button>
+      <button class="btn" onclick="closeModal()">取消</button>
+    </div>
+    <p style="font-size:11px;color:#9CA3AF;margin-top:10px">「已付費，待確認日期」：學員已完成付費，但尚未確定新的上課日期，會列入下方「待改期清單」，待確認後再改期。</p>
   </div>
 </div>
 
@@ -610,7 +623,7 @@ tr:hover td{background:#FAFAFA}
 <script>
 // ===== GOOGLE SHEETS API CONFIG =====
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwz47KEU8iWvcIHA-aiNltQBFEk1uXGV_RJXtMRC9ku4FFGBzMZQekl7mwN8Bj-UTtISA/exec';
-const APP_VERSION = 'v2026-06-25-j'; // 短桿果嶺人數上限改為12人
+const APP_VERSION = 'v2026-06-29-a'; // 新增「已付費待改期」按鈕與待改期清單
 (function(){ const v=document.getElementById('app-version'); if(v) v.textContent=APP_VERSION; })();
 let isOnline = false;
 let syncStatus = 'init';
@@ -1379,7 +1392,7 @@ function initRegPage(){
   const notice=document.getElementById('reg-admin-notice');
   if(currentRole==='admin'){dateEl.removeAttribute('min');notice.style.display='none';}
   else{dateEl.min=todayISO();notice.style.display='flex';}
-  syncCoachHours();renderRegTable();resetStudentFields();
+  syncCoachHours();renderRegTable();renderPendingRescheduleTable();resetStudentFields();
 }
 function onRegDateChange(){
   const date=document.getElementById('reg-date').value,al=document.getElementById('reg-alert'),sel=document.getElementById('reg-coach');
@@ -1465,7 +1478,7 @@ function clearReg(){
   const cb=document.getElementById('reg-solo-class');
   if(cb.checked){cb.checked=false;onSoloClassChange();}
 }
-function deleteReg(id){if(!confirm('確定刪除此筆報名？'))return;markDeleted('regs',id);registrations=registrations.filter(r=>r.id!==id);sv('v3_regs',registrations);saveToSheets('regs');renderRegTable();renderSchedule();renderStudents()}
+function deleteReg(id){if(!confirm('確定刪除此筆報名？'))return;markDeleted('regs',id);registrations=registrations.filter(r=>r.id!==id);sv('v3_regs',registrations);saveToSheets('regs');renderRegTable();renderPendingRescheduleTable();renderSchedule();renderStudents()}
 function renderRegTable(){
   const tbody=document.getElementById('reg-tbody');if(!tbody)return;
   const fd=(document.getElementById('reg-search-date')||{}).value||'';
@@ -1695,9 +1708,60 @@ function confirmReschedule(){
   if(taken+r.count>4){al.className='alert alert-warn';al.textContent='⚠️ 該教練此日名額不足';return}
   const oldDate=r.date,oldCoach=r.coach;r.date=newDate;r.coach=newCoach;
   r.rescheduleLog=(r.rescheduleLog||[]);r.rescheduleLog.push({from:oldDate,fromCoach:oldCoach,to:newDate,toCoach:newCoach,reason:reason||'未填寫'});
-  sv('v3_regs',registrations);saveToSheets('regs');closeModal();renderRegTable();renderSchedule();
+  // 已確認新日期，清除「待改期」標記
+  r.pendingReschedule=false;
+  sv('v3_regs',registrations);saveToSheets('regs');closeModal();renderRegTable();renderPendingRescheduleTable();renderSchedule();
 }
 function closeModal(){document.getElementById('reschedule-modal').classList.remove('show');rescheduleTargetId=null}
+
+// 標記為「已付費，待確認改期日期」
+function markPendingReschedule(){
+  const reason=document.getElementById('modal-reason').value.trim();
+  const r=registrations.find(x=>x.id===rescheduleTargetId);if(!r)return;
+  r.pendingReschedule=true;
+  r.pendingRescheduleAt=Date.now();
+  r.pendingRescheduleReason=reason||'未填寫';
+  sv('v3_regs',registrations);saveToSheets('regs');
+  closeModal();renderRegTable();renderPendingRescheduleTable();renderSchedule();
+}
+
+// 從待改期清單直接跳回改期 modal
+function openRescheduleFromPending(id){ closeModal(); openReschedule(id); }
+
+// 取消「待改期」標記
+function cancelPendingReschedule(id){
+  if(!confirm('確定取消此筆的待改期標記？'))return;
+  const r=registrations.find(x=>x.id===id);if(!r)return;
+  r.pendingReschedule=false;
+  sv('v3_regs',registrations);saveToSheets('regs');
+  renderRegTable();renderPendingRescheduleTable();
+}
+
+// 渲染待改期清單
+function renderPendingRescheduleTable(){
+  const list=registrations.filter(r=>r.pendingReschedule===true);
+  const card=document.getElementById('pending-reschedule-card');
+  const tbody=document.getElementById('pending-reschedule-tbody');
+  const countBadge=document.getElementById('pending-reschedule-count');
+  if(!card||!tbody)return;
+  if(!list.length){ card.style.display='none'; return; }
+  card.style.display='block';
+  if(countBadge) countBadge.textContent=list.length+' 筆';
+  tbody.innerHTML=list.sort((a,b)=>a.pendingRescheduleAt-b.pendingRescheduleAt).map(r=>`<tr style="background:#FFF7ED">
+    <td><span style="font-weight:600">${r.date}</span></td>
+    <td><span class="avatar">${(r.selfCoach||'?').slice(0,2)}</span>${r.selfCoach||'—'}</td>
+    <td style="font-weight:500">${r.studentName}</td>
+    <td>${r.count}</td>
+    <td><span class="avatar">${r.coach.slice(0,2)}</span>${r.coach}</td>
+    <td>${r.feeType}</td>
+    <td><span style="font-size:11px;color:#9CA3AF">${r.pendingRescheduleAt?new Date(r.pendingRescheduleAt).toLocaleDateString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):''}</span></td>
+    <td style="color:#C2410C;font-size:12px">${r.pendingRescheduleReason||'—'}</td>
+    <td><div style="display:flex;gap:4px">
+      <button class="btn btn-primary btn-sm" onclick="openRescheduleFromPending(${r.id})"><i class="ti ti-calendar-event"></i> 安排改期</button>
+      <button class="btn btn-sm" onclick="cancelPendingReschedule(${r.id})">取消標記</button>
+    </div></td>
+  </tr>`).join('');
+}
 
 // ===== STUDENTS =====
 function addStudent(){const name=document.getElementById('stu-name').value.trim(),plan=document.getElementById('stu-plan').value,total=parseInt(document.getElementById('stu-total').value)||1;if(!name)return;students.push({id:Date.now(),name,plan,totalSessions:total,source:'manual'});sv('v3_students',students);saveToSheets('students');document.getElementById('stu-name').value='';document.getElementById('stu-total').value='1';renderStudents()}
