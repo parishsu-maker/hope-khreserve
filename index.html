@@ -623,7 +623,7 @@ tr:hover td{background:#FAFAFA}
 <script>
 // ===== GOOGLE SHEETS API CONFIG =====
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwz47KEU8iWvcIHA-aiNltQBFEk1uXGV_RJXtMRC9ku4FFGBzMZQekl7mwN8Bj-UTtISA/exec';
-const APP_VERSION = 'v2026-06-29-a'; // 新增「已付費待改期」按鈕與待改期清單
+const APP_VERSION = 'v2026-06-29-b'; // 待改期的報名從主表格移除，只顯示在待改期清單
 (function(){ const v=document.getElementById('app-version'); if(v) v.textContent=APP_VERSION; })();
 let isOnline = false;
 let syncStatus = 'init';
@@ -1496,7 +1496,7 @@ function renderRegTable(){
     }
   }
   if(!registrations.length){tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:#9CA3AF;padding:2rem">尚無報名記錄</td></tr>';return}
-  let list=[...registrations];
+  let list=registrations.filter(r=>!r.pendingReschedule);
   if(searching){
     if(fd) list=list.filter(r=>r.date===fd);
     if(fn) list=list.filter(r=>(r.studentName||'').toLowerCase().includes(fn));
