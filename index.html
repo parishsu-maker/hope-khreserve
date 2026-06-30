@@ -623,7 +623,7 @@ tr:hover td{background:#FAFAFA}
 <script>
 // ===== GOOGLE SHEETS API CONFIG =====
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwz47KEU8iWvcIHA-aiNltQBFEk1uXGV_RJXtMRC9ku4FFGBzMZQekl7mwN8Bj-UTtISA/exec';
-const APP_VERSION = 'v2026-06-29-c'; // 改期/刪除/待改期操作按鈕限行政才顯示
+const APP_VERSION = 'v2026-06-29-d'; // 短桿果嶺刪除按鈕也限行政才顯示
 (function(){ const v=document.getElementById('app-version'); if(v) v.textContent=APP_VERSION; })();
 let isOnline = false;
 let syncStatus = 'init';
@@ -1677,7 +1677,7 @@ function renderShortTable(){
     <td style="font-weight:500">${r.studentName}</td><td>${r.count}</td>
     <td style="font-weight:600">NT$ ${r.amount.toLocaleString()}${r.priceMode==='hourly'?'<span class="time-sub">'+r.hours+'小時/人</span>':''}</td>
     <td style="color:#9CA3AF">${r.note||'—'}</td>
-    <td><button class="btn btn-danger btn-sm" onclick="deleteShort(${r.id})">刪除</button></td></tr>`).join('');
+    <td>${currentRole==='admin'?`<button class="btn btn-danger btn-sm" onclick="deleteShort(${r.id})">刪除</button>`:''}</td></tr>`).join('');
 }
 function clearShortSearch(){
   const d=document.getElementById('short-search-date'),n=document.getElementById('short-search-name');
