@@ -623,7 +623,7 @@ tr:hover td{background:#FAFAFA}
 <script>
 // ===== GOOGLE SHEETS API CONFIG =====
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwz47KEU8iWvcIHA-aiNltQBFEk1uXGV_RJXtMRC9ku4FFGBzMZQekl7mwN8Bj-UTtISA/exec';
-const APP_VERSION = 'v2026-06-29-e'; // 改期日期選單只顯示今天起的未來日期
+const APP_VERSION = 'v2026-06-29-f'; // 修正待改期跨裝置同步：gas.js保存欄位+時間戳校正
 (function(){ const v=document.getElementById('app-version'); if(v) v.textContent=APP_VERSION; })();
 let isOnline = false;
 let syncStatus = 'init';
@@ -935,7 +935,25 @@ async function loadFromSheets() {
     const remote = data.regs
       .map(r => ({ ...r, date: normalizeDate(r.date, yearFromCreatedAt(r.createdAt)) }))
       .filter(r => validDate(r.date));
+    // 先記錄本機「待改期標記」狀態與標記時間，供合併後校正
+    // （避免同步競態：本機剛標記/剛取消，但 Sheets 尚未反映時被舊資料蓋回）
+    const localPending = {};
+    registrations.forEach(r => {
+      localPending[r.id] = { flag: !!r.pendingReschedule, at: Number(r.pendingRescheduleAt) || 0, reason: r.pendingRescheduleReason || '' };
+    });
     registrations = mergeRemoteFirst(registrations, remote, _pendingIds.regs, _deletedIds.regs);
+    // 校正：比對本機標記時間與 Sheets 版本，以「較新的操作」為準
+    registrations.forEach(r => {
+      const lp = localPending[r.id];
+      if (!lp) return; // 這筆是別台新增的，直接接受 Sheets
+      const remoteAt = Number(r.pendingRescheduleAt) || 0;
+      // 本機的待改期操作比 Sheets 新 → 沿用本機狀態（含標記或取消標記）
+      if (lp.at > remoteAt) {
+        r.pendingReschedule = lp.flag;
+        r.pendingRescheduleAt = lp.at;
+        r.pendingRescheduleReason = lp.reason;
+      }
+    });
   }
 
   // 短桿果嶺報名 — 以 Sheets 為主
@@ -1708,8 +1726,9 @@ function confirmReschedule(){
   if(taken+r.count>4){al.className='alert alert-warn';al.textContent='⚠️ 該教練此日名額不足';return}
   const oldDate=r.date,oldCoach=r.coach;r.date=newDate;r.coach=newCoach;
   r.rescheduleLog=(r.rescheduleLog||[]);r.rescheduleLog.push({from:oldDate,fromCoach:oldCoach,to:newDate,toCoach:newCoach,reason:reason||'未填寫'});
-  // 已確認新日期，清除「待改期」標記
+  // 已確認新日期，清除「待改期」標記（更新時間戳，供同步校正判斷此為最新操作）
   r.pendingReschedule=false;
+  r.pendingRescheduleAt=Date.now();
   sv('v3_regs',registrations);saveToSheets('regs');closeModal();renderRegTable();renderPendingRescheduleTable();renderSchedule();
 }
 function closeModal(){document.getElementById('reschedule-modal').classList.remove('show');rescheduleTargetId=null}
@@ -1733,6 +1752,7 @@ function cancelPendingReschedule(id){
   if(!confirm('確定取消此筆的待改期標記？'))return;
   const r=registrations.find(x=>x.id===id);if(!r)return;
   r.pendingReschedule=false;
+  r.pendingRescheduleAt=Date.now(); // 更新時間戳，供同步校正判斷此為最新操作
   sv('v3_regs',registrations);saveToSheets('regs');
   renderRegTable();renderPendingRescheduleTable();
 }
