@@ -597,6 +597,25 @@ tr:hover td{background:#FAFAFA}
   </div>
 </div>
 
+<!-- 編輯 Modal（人數 + 備註）-->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal-box">
+    <div class="modal-title"><i class="ti ti-edit"></i> 編輯報名</div>
+    <div class="modal-info" id="edit-modal-info"></div>
+    <div id="edit-modal-alert" class="alert"></div>
+    <div class="form-row" style="margin-bottom:10px">
+      <div class="fg"><label class="req">人數</label>
+        <select id="edit-count"></select></div>
+    </div>
+    <div class="fg" style="margin-bottom:1rem"><label>備註</label><input type="text" id="edit-note" placeholder="選填"></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" onclick="confirmEdit()">儲存變更</button>
+      <button class="btn" onclick="closeEditModal()">取消</button>
+    </div>
+    <p style="font-size:11px;color:#9CA3AF;margin-top:10px">此處僅能修改「人數」與「備註」。若需修改日期或教練，請用「改期」功能。</p>
+  </div>
+</div>
+
 <!-- URL Setting Modal -->
 <div class="modal-overlay" id="url-modal">
   <div class="modal-box" style="max-width:500px">
@@ -623,7 +642,7 @@ tr:hover td{background:#FAFAFA}
 <script>
 // ===== GOOGLE SHEETS API CONFIG =====
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwz47KEU8iWvcIHA-aiNltQBFEk1uXGV_RJXtMRC9ku4FFGBzMZQekl7mwN8Bj-UTtISA/exec';
-const APP_VERSION = 'v2026-06-29-f'; // 修正待改期跨裝置同步：gas.js保存欄位+時間戳校正
+const APP_VERSION = 'v2026-07-30-b'; // 編輯功能加入跨裝置同步保護（editedAt校正+gas.js欄位）
 (function(){ const v=document.getElementById('app-version'); if(v) v.textContent=APP_VERSION; })();
 let isOnline = false;
 let syncStatus = 'init';
@@ -935,11 +954,14 @@ async function loadFromSheets() {
     const remote = data.regs
       .map(r => ({ ...r, date: normalizeDate(r.date, yearFromCreatedAt(r.createdAt)) }))
       .filter(r => validDate(r.date));
-    // 先記錄本機「待改期標記」狀態與標記時間，供合併後校正
-    // （避免同步競態：本機剛標記/剛取消，但 Sheets 尚未反映時被舊資料蓋回）
+    // 先記錄本機「待改期標記」與「編輯」狀態及時間，供合併後校正
+    // （避免同步競態：本機剛標記/剛編輯，但 Sheets 尚未反映時被舊資料蓋回）
     const localPending = {};
     registrations.forEach(r => {
-      localPending[r.id] = { flag: !!r.pendingReschedule, at: Number(r.pendingRescheduleAt) || 0, reason: r.pendingRescheduleReason || '' };
+      localPending[r.id] = {
+        flag: !!r.pendingReschedule, at: Number(r.pendingRescheduleAt) || 0, reason: r.pendingRescheduleReason || '',
+        editedAt: Number(r.editedAt) || 0, count: r.count, note: r.note, khFee: r.khFee, coachFee: r.coachFee
+      };
     });
     registrations = mergeRemoteFirst(registrations, remote, _pendingIds.regs, _deletedIds.regs);
     // 校正：比對本機標記時間與 Sheets 版本，以「較新的操作」為準
@@ -953,6 +975,15 @@ async function loadFromSheets() {
         r.pendingRescheduleAt = lp.at;
         r.pendingRescheduleReason = lp.reason;
       }
+      // 本機的編輯（人數/備註）比 Sheets 新 → 沿用本機編輯後的值
+      const remoteEditedAt = Number(r.editedAt) || 0;
+      if (lp.editedAt > remoteEditedAt) {
+        r.count = lp.count;
+        r.note = lp.note;
+        r.khFee = lp.khFee;
+        r.coachFee = lp.coachFee;
+        r.editedAt = lp.editedAt;
+      }
     });
   }
 
@@ -961,7 +992,23 @@ async function loadFromSheets() {
     const remote = data.shortRegs
       .map(r => ({ ...r, date: normalizeDate(r.date, yearFromCreatedAt(r.createdAt)) }))
       .filter(r => validDate(r.date));
+    // 記錄本機編輯狀態，供合併後校正
+    const localEdited = {};
+    shortRegs.forEach(r => {
+      localEdited[r.id] = { editedAt: Number(r.editedAt) || 0, count: r.count, note: r.note, amount: r.amount };
+    });
     shortRegs = mergeRemoteFirst(shortRegs, remote, _pendingIds.shortRegs, _deletedIds.shortRegs);
+    shortRegs.forEach(r => {
+      const le = localEdited[r.id];
+      if (!le) return;
+      const remoteEditedAt = Number(r.editedAt) || 0;
+      if (le.editedAt > remoteEditedAt) {
+        r.count = le.count;
+        r.note = le.note;
+        r.amount = le.amount;
+        r.editedAt = le.editedAt;
+      }
+    });
   }
 
   // 學員 — 以 Sheets 為主
@@ -1534,7 +1581,7 @@ function renderRegTable(){
       <td><span class="avatar">${r.coach.slice(0,2)}</span>${r.coach}</td>
       <td>${r.feeType}${noChargeTag}</td><td>${sessions} 堂</td><td>${r.count} 人次</td>
       <td>${noteCell}</td>
-      <td>${currentRole==='admin'?`<div style="display:flex;gap:4px"><button class="btn btn-info btn-sm" onclick="openReschedule(${r.id})">改期</button><button class="btn btn-danger btn-sm" onclick="deleteReg(${r.id})">刪除</button></div>`:''}</td></tr>`;
+      <td>${currentRole==='admin'?`<div style="display:flex;gap:4px"><button class="btn btn-sm" onclick="openEditReg(${r.id})" style="color:#059669;border-color:#A7F3D0">編輯</button><button class="btn btn-info btn-sm" onclick="openReschedule(${r.id})">改期</button><button class="btn btn-danger btn-sm" onclick="deleteReg(${r.id})">刪除</button></div>`:''}</td></tr>`;
   }).join('');
 }
 function clearRegSearch(){
@@ -1695,7 +1742,7 @@ function renderShortTable(){
     <td style="font-weight:500">${r.studentName}</td><td>${r.count}</td>
     <td style="font-weight:600">NT$ ${r.amount.toLocaleString()}${r.priceMode==='hourly'?'<span class="time-sub">'+r.hours+'小時/人</span>':''}</td>
     <td style="color:#9CA3AF">${r.note||'—'}</td>
-    <td>${currentRole==='admin'?`<button class="btn btn-danger btn-sm" onclick="deleteShort(${r.id})">刪除</button>`:''}</td></tr>`).join('');
+    <td>${currentRole==='admin'?`<div style="display:flex;gap:4px"><button class="btn btn-sm" onclick="openEditShort(${r.id})" style="color:#059669;border-color:#A7F3D0">編輯</button><button class="btn btn-danger btn-sm" onclick="deleteShort(${r.id})">刪除</button></div>`:''}</td></tr>`).join('');
 }
 function clearShortSearch(){
   const d=document.getElementById('short-search-date'),n=document.getElementById('short-search-name');
@@ -1732,6 +1779,77 @@ function confirmReschedule(){
   sv('v3_regs',registrations);saveToSheets('regs');closeModal();renderRegTable();renderPendingRescheduleTable();renderSchedule();
 }
 function closeModal(){document.getElementById('reschedule-modal').classList.remove('show');rescheduleTargetId=null}
+
+// ===== 編輯報名（僅人數 + 備註）=====
+let editTargetId=null, editTargetType=null; // type: 'reg' | 'short'
+
+function openEditReg(id){
+  const r=registrations.find(x=>x.id===id);if(!r)return;
+  editTargetId=id; editTargetType='reg';
+  document.getElementById('edit-modal-info').innerHTML=`<strong>${r.studentName}</strong> &nbsp;${r.date} &nbsp;<span class="avatar" style="display:inline-flex">${r.coach.slice(0,2)}</span> ${r.coach}`;
+  // 人數選項：下場班上限 4 人（與報名一致）
+  const sel=document.getElementById('edit-count');
+  sel.innerHTML=[1,2,3,4].map(n=>`<option value="${n}">${n}人</option>`).join('');
+  sel.value=String(r.count||1);
+  document.getElementById('edit-note').value=r.note||'';
+  document.getElementById('edit-modal-alert').className='alert';
+  document.getElementById('edit-modal').classList.add('show');
+}
+
+function openEditShort(id){
+  const r=shortRegs.find(x=>x.id===id);if(!r)return;
+  editTargetId=id; editTargetType='short';
+  document.getElementById('edit-modal-info').innerHTML=`<strong>${r.studentName}</strong> &nbsp;${r.date} &nbsp;${r.time||''} &nbsp;<span class="avatar" style="display:inline-flex">${r.coach.slice(0,2)}</span> ${r.coach}`;
+  // 人數選項：短桿果嶺 1~12 人
+  const sel=document.getElementById('edit-count');
+  sel.innerHTML=[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option value="${n}">${n}人</option>`).join('');
+  sel.value=String(r.count||1);
+  document.getElementById('edit-note').value=r.note||'';
+  document.getElementById('edit-modal-alert').className='alert';
+  document.getElementById('edit-modal').classList.add('show');
+}
+
+function confirmEdit(){
+  const al=document.getElementById('edit-modal-alert');
+  const newCount=parseInt(document.getElementById('edit-count').value)||1;
+  const newNote=document.getElementById('edit-note').value.trim();
+  if(!newCount||newCount<1){al.className='alert alert-warn';al.textContent='請選擇人數';return}
+
+  if(editTargetType==='reg'){
+    const r=registrations.find(x=>x.id===editTargetId);if(!r)return;
+    // 檢查同教練同日加總人數是否超過 4 人（排除本筆）
+    const others=registrations.filter(x=>x.date===r.date&&x.coach===r.coach&&x.id!==r.id).reduce((s,x)=>s+x.count,0);
+    if(others+newCount>4){al.className='alert alert-warn';al.textContent='⚠️ 該教練此日加總後超過 4 人上限（其他已佔 '+others+' 人）';return}
+    r.count=newCount;
+    r.note=newNote;
+    r.editedAt=Date.now(); // 編輯時間戳，供同步校正
+    // 重算隨人數變動的費用（不計費維持 0；其餘依現行規則）
+    const noCharge=isRegNoCharge(r);
+    r.khFee=noCharge?0:newCount*khRate;
+    r.coachFee=noCharge?0:calcLockedCoachFee(r.coach,newCount,!!r.soloClass);
+    sv('v3_regs',registrations);saveToSheets('regs');
+    closeEditModal();renderRegTable();renderPendingRescheduleTable();renderSchedule();renderStudents();
+  } else if(editTargetType==='short'){
+    const r=shortRegs.find(x=>x.id===editTargetId);if(!r)return;
+    r.count=newCount;
+    r.note=newNote;
+    r.editedAt=Date.now(); // 編輯時間戳，供同步校正
+    // 重算短桿費用（依原本的計價方式）
+    if(r.priceMode==='hourly'){
+      const h=Math.max(1,r.hours||1);
+      r.amount=Math.round(shortHourlyRate*h*newCount);
+    }else{
+      r.amount=shortRate*newCount;
+    }
+    sv('v3_shortRegs',shortRegs);saveToSheets('shortRegs');
+    closeEditModal();renderShortTable();renderSchedule();renderStudents();
+  }
+}
+
+function closeEditModal(){
+  document.getElementById('edit-modal').classList.remove('show');
+  editTargetId=null; editTargetType=null;
+}
 
 // 標記為「已付費，待確認改期日期」
 function markPendingReschedule(){
