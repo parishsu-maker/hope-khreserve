@@ -642,7 +642,7 @@ tr:hover td{background:#FAFAFA}
 <script>
 // ===== GOOGLE SHEETS API CONFIG =====
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwz47KEU8iWvcIHA-aiNltQBFEk1uXGV_RJXtMRC9ku4FFGBzMZQekl7mwN8Bj-UTtISA/exec';
-const APP_VERSION = 'v2026-07-30-b'; // 編輯功能加入跨裝置同步保護（editedAt校正+gas.js欄位）
+const APP_VERSION = 'v2026-07-30-c'; // 財務報表下載Excel與畫面統計排除待改期資料
 (function(){ const v=document.getElementById('app-version'); if(v) v.textContent=APP_VERSION; })();
 let isOnline = false;
 let syncStatus = 'init';
@@ -1946,7 +1946,7 @@ function downloadExcel(mode){
   let start,end,label;
   if(mode==='month'){const m=document.getElementById('export-month').value;if(!m){alert('請選擇月份');return}start=m+'-01';const d=new Date(m+'-01');d.setMonth(d.getMonth()+1);d.setDate(0);end=toISO(d);label=m}
   else{start=document.getElementById('export-start').value;end=document.getElementById('export-end').value;if(!start||!end){alert('請選擇日期');return}if(start>end){alert('開始日期不能晚於結束日期');return}label=start+'_to_'+end}
-  const regs=registrations.filter(r=>r.date>=start&&r.date<=end).sort((a,b)=>a.id-b.id);
+  const regs=registrations.filter(r=>r.date>=start&&r.date<=end&&!r.pendingReschedule).sort((a,b)=>a.id-b.id);
   const sRegs=shortRegs.filter(r=>r.date>=start&&r.date<=end).sort((a,b)=>a.id-b.id);
   const chargeRegs=regs.filter(r=>!isRegNoCharge(r));  // 統計用：排除不計費課程（以訂單設定為準）
   const openRegs=chargeRegs.filter(r=>isClassOpen(r.date,r.coach));
@@ -1955,7 +1955,7 @@ function downloadExcel(mode){
   const byCoach={};chargeRegs.forEach(r=>{const open=isClassOpen(r.date,r.coach);const sessions=r.sessions||r.count;if(!byCoach[r.coach])byCoach[r.coach]={openDays:new Set(),students:0,sessions:0,coachHours:0,fee:0};if(open){byCoach[r.coach].openDays.add(r.date);byCoach[r.coach].students+=r.count;byCoach[r.coach].sessions+=sessions;byCoach[r.coach].coachHours+=r.count;byCoach[r.coach].fee+=(r.coachFee||0)}});
   const coachRows=Object.entries(byCoach).map(([c,d])=>({'教練':c,'開班堂數':d.openDays.size,'學員總人次':d.students,'課堂數':d.sessions,'教練上課時數':d.coachHours,'教練費合計':Math.round(d.fee)}));
   const shortRows=sRegs.map(r=>({'日期':r.date,'登記時間':fmtTime(r.createdAt||r.id),'時段':r.time,'登記教練':r.selfCoach||'','指定教練':r.coach,'學員姓名':r.studentName,'人數':r.count,'計價方式':r.priceMode==='hourly'?'每小時':'每人固定','時數':r.priceMode==='hourly'?r.hours:'','收款':r.amount,'備註':r.note||''}));
-  const noChargeRows=registrations.filter(r=>isRegNoCharge(r)&&r.date>=start&&r.date<=end).sort((a,b)=>a.id-b.id).map(r=>({'日期':r.date,'登記時間':fmtTime(r.createdAt||r.id),'登記教練':r.selfCoach||'','指定教練':r.coach,'學員姓名':r.studentName,'人數':r.count,'系統已購課訂單':r.feeType,'備註':r.note||''}));
+  const noChargeRows=registrations.filter(r=>isRegNoCharge(r)&&r.date>=start&&r.date<=end&&!r.pendingReschedule).sort((a,b)=>a.id-b.id).map(r=>({'日期':r.date,'登記時間':fmtTime(r.createdAt||r.id),'登記教練':r.selfCoach||'','指定教練':r.coach,'學員姓名':r.studentName,'人數':r.count,'系統已購課訂單':r.feeType,'備註':r.note||''}));
   const summaryRows=[{'項目':'區間','數值':start+' 至 '+end},{'項目':'下場班總人次（開班）','數值':openRegs.reduce((s,r)=>s+r.count,0)},{'項目':'已開班課堂數','數值':openRegs.reduce((s,r)=>s+(r.sessions||r.count),0)},{'項目':'已開班教練上課時數','數值':openRegs.reduce((s,r)=>s+r.count,0)},{'項目':'應付國華費用（NT$）','數值':openRegs.reduce((s,r)=>s+(r.khFee||0),0)},{'項目':'教練費合計（僅開班）','數值':Math.round(openRegs.reduce((s,r)=>s+(r.coachFee||0),0))},{'項目':'短桿果嶺總收款','數值':sRegs.reduce((s,r)=>s+r.amount,0)},{'項目':'短桿果嶺人次','數值':sRegs.reduce((s,r)=>s+r.count,0)}];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(detailRows.length?detailRows:[{提示:'此區間無資料'}]),'下場班明細');
@@ -1969,7 +1969,7 @@ function renderFinance(){
   ensureArrays();
   fillSel('fin-coach',true);
   const month=(document.getElementById('fin-month')||{}).value||'',fc=(document.getElementById('fin-coach')||{}).value||'';
-  let regs=registrations.filter(r=>!isRegNoCharge(r));if(month)regs=regs.filter(r=>r.date.startsWith(month));if(fc)regs=regs.filter(r=>r.coach===fc);
+  let regs=registrations.filter(r=>!isRegNoCharge(r)&&!r.pendingReschedule);if(month)regs=regs.filter(r=>r.date.startsWith(month));if(fc)regs=regs.filter(r=>r.coach===fc);
   let sRegs=shortRegs;if(month)sRegs=sRegs.filter(r=>r.date.startsWith(month));
   const openRegs=regs.filter(r=>isClassOpen(r.date,r.coach));
   const totalStu=openRegs.reduce((s,r)=>s+r.count,0),totalKH=openRegs.reduce((s,r)=>s+(r.khFee!==undefined?r.khFee:r.count*khRate),0);
@@ -1994,7 +1994,7 @@ function renderFinance(){
   // 不計費課程明細：從原始 registrations 篩出 noCharge（依月份/教練篩選），不列入上方結帳統計
   const nt=document.getElementById('fin-nocharge-tbody');
   if(nt){
-    let ncRegs=registrations.filter(r=>isRegNoCharge(r));
+    let ncRegs=registrations.filter(r=>isRegNoCharge(r)&&!r.pendingReschedule);
     if(month)ncRegs=ncRegs.filter(r=>r.date.startsWith(month));
     if(fc)ncRegs=ncRegs.filter(r=>r.coach===fc);
     nt.innerHTML=ncRegs.length?[...ncRegs].sort((a,b)=>a.id-b.id).map(r=>`<tr style="background:#FAF5FF"><td>${r.date}</td><td>${r.selfCoach||'—'}</td><td style="font-weight:500">${r.studentName}</td><td>${r.coach}</td><td>${r.feeType}</td><td>${r.count}</td><td style="color:#9CA3AF">${r.note||'—'}</td></tr>`).join(''):'<tr><td colspan="7" style="text-align:center;color:#9CA3AF;padding:1.5rem">此期間無不計費課程</td></tr>';
